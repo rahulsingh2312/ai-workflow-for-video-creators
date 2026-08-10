@@ -264,7 +264,7 @@ function seedTopicRun(conn: DatabaseSync, t: string) {
       "High keyword match, a fresh primary source, and your last two rule-explainer videos outperformed the account average.",
       "关键词匹配度高、有新鲜的一手来源，而且你最近两条讲规则的视频都高于账号平均。",
       ["s_reg", "s_qa", "s_assoc"],
-      [["MEDIUM", "Regulation is a sensitive category", "监管属于敏感类别"]]],
+      [["MEDIUM", "Sensitive: regulation", "敏感：监管"]]],
     ["c_205",
       "What a half-point reserve-ratio cut actually does to a small bank", "降准 0.5 个百分点，对一家小银行到底意味着什么",
       "One balance sheet, walked through line by line", "拿一张资产负债表，一行一行走一遍",
@@ -273,7 +273,7 @@ function seedTopicRun(conn: DatabaseSync, t: string) {
       "Strong search interest this week, and the balance-sheet format is one your audience finishes at a higher rate.",
       "本周搜索热度高，而且资产负债表这种形式，你的观众完播率更好。",
       ["s_pboc", "s_own"],
-      [["LOW", "Forecasting language to watch", "注意预测性表述"]]],
+      [["LOW", "Forecast wording", "预测性表述"]]],
     ["c_206",
       "Why this year's consumption data feels wrong to everyone", "为什么今年的消费数据，和你的体感差这么多",
       "The gap between the basket and your basket", "统计的那个篮子，和你的篮子之间的差距",
@@ -290,8 +290,8 @@ function seedTopicRun(conn: DatabaseSync, t: string) {
       "Timely, but it names a listed company and the supporting evidence is a single filing. Ranked low on purpose.",
       "够及时，但点名了上市公司，支撑证据只有一份财报。刻意排低。",
       ["s_filing"],
-      [["HIGH", "Names a specific listed company", "点名具体上市公司"],
-       ["HIGH", "Implies a forecast about that company", "对该公司构成预测暗示"]]],
+      [["HIGH", "Names a company", "点名公司"],
+       ["HIGH", "Implies a forecast", "构成预测暗示"]]],
   ];
 
   for (const [cid, ten, tzh, aen, azh, wen, wzh, score, ren, rzh, srcs, risks] of cands) {

@@ -31,6 +31,7 @@ import {
   Target,
   Upload,
   X,
+  Calendar,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Lang } from "@/lib/i18n";
@@ -69,6 +70,18 @@ import {
   CHIP_COLORS,
   PrimaryAction,
 } from "@/components/app/Shell";
+import {
+  Avatar,
+  CellIcon,
+  DOT,
+  List,
+  ListCell,
+  ListGroupHeader,
+  ListRow,
+  Priority,
+  StatusGlyph,
+  Tag,
+} from "@/components/app/List";
 
 /* ── Types from the API ──────────────────────────────────────────────────── */
 
@@ -920,6 +933,15 @@ function HomeScreen({
   );
 }
 
+/*
+  The topic list.
+
+  Columns are fixed tracks so every row lines up: glyph, score, title, tags,
+  date, priority, who decided. The title track is the only flexible one, so it
+  absorbs every width difference and nothing else drifts between rows.
+*/
+const TOPIC_COLUMNS = ["auto", "2.5rem", "minmax(0,1fr)", "13rem", "6.5rem", "5.5rem", "2rem"];
+
 function Topics({
   lang,
   topics,
@@ -936,269 +958,269 @@ function Topics({
   const zh = lang === "zh";
   const t = (en: string, z: string) => (zh ? z : en);
   const [reason, setReason] = useState<Record<string, string>>({});
-  const [open, setOpen] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [tab, setTab] = useState<"waiting" | "all">("waiting");
+
   const candidates = (topics?.candidates as Row[]) ?? [];
   const links = (topics?.links as Row[]) ?? [];
   const sources = (topics?.sources as Row[]) ?? [];
   const risks = (topics?.risks as Row[]) ?? [];
-  const undecided = candidates.filter((c) => !c.decision);
+
+  const scoped = tab === "waiting" ? candidates.filter((c) => !c.decision) : candidates;
+  const groups = [
+    { key: "waiting", label: t("Waiting on you", "等你处理"), rows: scoped.filter((c) => !c.decision) },
+    { key: "accepted", label: t("Taken", "已采用"), rows: scoped.filter((c) => c.decision === "accepted") },
+    { key: "rejected", label: t("Passed on", "已放过"), rows: scoped.filter((c) => c.decision === "rejected") },
+  ].filter((g) => g.rows.length);
+
+  const sourcesFor = (id: string) =>
+    links
+      .filter((l) => l.candidate_id === id)
+      .map((l) => sources.find((x) => x.id === l.source_id))
+      .filter(Boolean) as Row[];
+  const risksFor = (id: string) => risks.filter((r) => r.candidate_id === id);
+  const level = (score: number): "high" | "medium" | "low" =>
+    score >= 80 ? "high" : score >= 65 ? "medium" : "low";
+  const levelLabel = { high: t("High", "高"), medium: t("Medium", "中"), low: t("Low", "低") };
 
   return (
     <>
-      <PageHead
-        title={t("Topic suggestions", "选题建议")}
-        subtitle={t(
-          "Ideas found for you, best first. Take one and it becomes a script.",
-          "为你找到的选题，好的排前面。选一条，它就会变成脚本。",
-        )}
-        action={
-          <Button
-            icon={Sparkles}
-            onClick={() => act("topics", { method: "POST", body: "{}" })}
-            loading={busy}
-          >
-            {t("Find more", "再找一些")}
-          </Button>
-        }
-      />
+      <div className="flex items-center gap-3 px-6 pt-5">
+        <h1 className="min-w-0 flex-1 truncate text-[16px] font-medium" style={{ color: "var(--ink-gray-8)" }}>
+          {t("Topics", "选题")}
+        </h1>
+        <PrimaryAction icon={Sparkles} loading={busy} onClick={() => act("topics", { method: "POST", body: "{}" })}>
+          {t("Find topics", "找选题")}
+        </PrimaryAction>
+      </div>
 
-      {!undecided.length ? (
-        <EmptyState
-          icon={Lightbulb}
-          title={t("Nothing waiting", "没有待处理的候选")}
-          body={t("Every suggestion has been dealt with.", "候选都处理完了。")}
-          action={
-            <Button
-              icon={Sparkles}
-              onClick={() => act("topics", { method: "POST", body: "{}" })}
+      <div className="flex flex-wrap items-center gap-2 px-6 pt-5">
+        <div className="flex items-center rounded-[var(--r-sm)] p-[3px]" style={{ background: "var(--rail)" }}>
+          {(
+            [
+              ["waiting", t("Waiting", "待处理")],
+              ["all", t("All", "全部")],
+            ] as const
+          ).map(([k, l]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setTab(k)}
+              className="rounded-[4px] px-2.5 py-1 text-[13px] [transition:background-color_140ms_var(--e-out),color_140ms_var(--e-out)]"
+              style={{
+                background: tab === k ? "var(--surface-white)" : "transparent",
+                color: tab === k ? "var(--ink-gray-8)" : "var(--ink-gray-5)",
+                boxShadow: tab === k ? "var(--sh-sm)" : undefined,
+              }}
             >
-              {t("Find more", "再找一些")}
-            </Button>
-          }
-        />
-      ) : null}
+              {l}
+            </button>
+          ))}
+        </div>
+        <span className="ml-auto text-[13px]" style={{ color: "var(--ink-gray-5)" }}>
+          {scoped.length} {t("topics", "条")}
+        </span>
+      </div>
 
-      <div className="app-stagger space-y-3">
-        {candidates.map((c) => {
-          const mine = links
-            .filter((l) => l.candidate_id === c.id)
-            .map((l) => sources.find((s) => s.id === l.source_id))
-            .filter(Boolean) as Row[];
-          const myRisks = risks.filter((r) => r.candidate_id === c.id);
-          const serious = myRisks.some(
-            (r) => r.level === "HIGH" || r.level === "CRITICAL",
-          );
-          const expanded = open === c.id;
-          const decided = Boolean(c.decision);
+      <div className="px-6 pb-10 pt-4">
+        {!groups.length ? (
+          <div className="flex flex-col items-center gap-1 py-16 text-center">
+            <Lightbulb className="size-6" strokeWidth={1.5} style={{ color: "var(--ink-gray-4)" }} aria-hidden />
+            <p className="text-[14px] font-medium" style={{ color: "var(--ink-gray-7)" }}>
+              {t("Nothing waiting", "没有待处理的候选")}
+            </p>
+            <p className="text-[13px]" style={{ color: "var(--ink-gray-5)" }}>
+              {t("Look for more whenever you want.", "想要更多随时可以再找。")}
+            </p>
+          </div>
+        ) : null}
 
-          return (
-            <Card
-              key={c.id}
-              className={
-                decided && c.decision !== "accepted" ? "opacity-60" : undefined
-              }
-            >
-              <div className="flex items-start gap-4">
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px]"
-                  style={{
-                    background:
-                      c.score >= 80
-                        ? "var(--surface-green-2)"
-                        : "var(--surface-gray-2)",
-                    color:
-                      c.score >= 80
-                        ? "var(--ink-green-3)"
-                        : "var(--ink-gray-6)",
-                  }}
-                >
-                  <span className="text-[15px] font-bold leading-none">
-                    {c.score}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-[16.5px] font-semibold leading-snug">
-                    {zh ? c.title_zh : c.title_en}
-                  </h3>
-                  <p
-                    className="mt-1 text-[13.5px] leading-snug"
-                    style={{ color: "var(--ink-gray-6)" }}
-                  >
-                    {zh ? c.angle_zh : c.angle_en}
-                  </p>
-                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                    <Badge>
-                      {mine.length}{" "}
-                      {t(mine.length === 1 ? "source" : "sources", "个来源")}
-                    </Badge>
-                    {serious ? (
-                      <Badge tone="red" icon={AlertTriangle}>
-                        {t("Risky", "有风险")}
-                      </Badge>
-                    ) : null}
-                    {decided ? (
-                      <Badge
-                        tone={c.decision === "accepted" ? "green" : "gray"}
-                      >
-                        {c.decision === "accepted"
-                          ? t("Taken", "已采用")
-                          : t("Passed on", "已放过")}
-                      </Badge>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => setOpen(expanded ? null : c.id)}
-                      className="text-[13px] font-medium underline underline-offset-2"
-                      style={{ color: "var(--ink-gray-6)" }}
-                    >
-                      {expanded
-                        ? t("Less", "收起")
-                        : t("Why this one", "为什么是它")}
-                    </button>
-                  </div>
-                </div>
+        <div className="space-y-4">
+          {groups.map((g) => {
+            const open = !collapsed[g.key];
+            return (
+              <div key={g.key}>
+                <ListGroupHeader
+                  label={g.label}
+                  count={g.rows.length}
+                  open={open}
+                  lang={lang}
+                  onToggle={() => setCollapsed((p) => ({ ...p, [g.key]: open }))}
+                />
+                {open ? (
+                  <List columns={TOPIC_COLUMNS} className="mt-1">
+                    {g.rows.map((c) => {
+                      const mine = sourcesFor(c.id);
+                      const myRisks = risksFor(c.id);
+                      const lv = level(c.score);
+                      const expanded = openId === c.id;
+                      return (
+                        <div key={c.id}>
+                          <ListRow onClick={() => setOpenId(expanded ? null : c.id)}>
+                            <ListCell>
+                              <StatusGlyph
+                                kind={
+                                  c.decision === "accepted"
+                                    ? "done"
+                                    : c.decision === "rejected"
+                                      ? "cancelled"
+                                      : "todo"
+                                }
+                              />
+                            </ListCell>
+                            <ListCell>
+                              <span className="text-[13px] tabular-nums" style={{ color: "var(--ink-gray-4)" }}>
+                                {c.score}
+                              </span>
+                            </ListCell>
+                            <ListCell>
+                              <span className="truncate text-[14px] font-medium" style={{ color: "var(--ink-gray-8)" }}>
+                                {zh ? c.title_zh : c.title_en}
+                              </span>
+                            </ListCell>
+                            <ListCell className="gap-1.5 overflow-hidden">
+                              <Tag label={`${mine.length} ${t("sources", "来源")}`} dot={DOT.gray} />
+                              {myRisks.slice(0, 1).map((r) => (
+                                <Tag
+                                  key={r.id}
+                                  label={zh ? r.note_zh : r.note_en}
+                                  dot={r.level === "HIGH" || r.level === "CRITICAL" ? DOT.red : DOT.amber}
+                                />
+                              ))}
+                              {myRisks.length > 1 ? (
+                                <span className="shrink-0 text-[12px]" style={{ color: "var(--ink-gray-4)" }}>
+                                  +{myRisks.length - 1}
+                                </span>
+                              ) : null}
+                            </ListCell>
+                            <ListCell>
+                              {mine[0]?.published_at ? (
+                                <span
+                                  className="flex items-center whitespace-nowrap text-[13px]"
+                                  style={{ color: "var(--ink-gray-5)" }}
+                                >
+                                  <CellIcon icon={Calendar} />
+                                  {String(mine[0].published_at).slice(5)}
+                                </span>
+                              ) : null}
+                            </ListCell>
+                            <ListCell>
+                              <Priority level={lv} label={levelLabel[lv]} />
+                            </ListCell>
+                            <ListCell className="justify-end">
+                              {c.decided_by_name ? <Avatar name={String(c.decided_by_name)} /> : null}
+                            </ListCell>
+                          </ListRow>
+
+                          {expanded ? (
+                            <div
+                              className="app-rise mb-2 ml-10 mr-3 rounded-[var(--r)] p-4"
+                              style={{ background: "var(--rail)" }}
+                            >
+                              <div className="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                  <p className="text-[12px] font-medium" style={{ color: "var(--ink-gray-5)" }}>
+                                    {t("Why now", "为什么是现在")}
+                                  </p>
+                                  <p className="mt-1 text-[13px] leading-normal" style={{ color: "var(--ink-gray-7)" }}>
+                                    {zh ? c.why_zh : c.why_en}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[12px] font-medium" style={{ color: "var(--ink-gray-5)" }}>
+                                    {t("Why this score", "为什么是这个分")}
+                                  </p>
+                                  <p className="mt-1 text-[13px] leading-normal" style={{ color: "var(--ink-gray-7)" }}>
+                                    {zh ? c.reason_zh : c.reason_en}
+                                  </p>
+                                </div>
+                                <div className="sm:col-span-2">
+                                  <p className="text-[12px] font-medium" style={{ color: "var(--ink-gray-5)" }}>
+                                    {t("Based on", "依据")}
+                                  </p>
+                                  <ul className="mt-1 space-y-1">
+                                    {mine.map((x) => (
+                                      <li
+                                        key={x.id}
+                                        className="flex items-center gap-2 text-[13px]"
+                                        style={{ color: "var(--ink-gray-7)" }}
+                                      >
+                                        <span
+                                          aria-hidden
+                                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                                          style={{ background: x.trust === "high" ? DOT.green : DOT.amber }}
+                                        />
+                                        {zh ? x.label_zh : x.label_en}
+                                        <span style={{ color: "var(--ink-gray-4)" }}>{x.published_at}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </div>
+
+                              {!c.decision ? (
+                                <div className="mt-4 flex flex-wrap items-end gap-2">
+                                  <div className="min-w-[220px] flex-1">
+                                    <Field
+                                      id={`r-${c.id}`}
+                                      label={t("Your reason", "你的理由")}
+                                      hint={t("It teaches the next round what you like.", "下一轮会照着你的口味来。")}
+                                    >
+                                      <Input
+                                        id={`r-${c.id}`}
+                                        value={reason[c.id] ?? ""}
+                                        onChange={(e) => setReason((p) => ({ ...p, [c.id]: e.target.value }))}
+                                        placeholder={t("Good timing and a solid source", "时机好，来源也扎实")}
+                                      />
+                                    </Field>
+                                  </div>
+                                  <Button
+                                    variant="solid"
+                                    disabled={!(reason[c.id] ?? "").trim()}
+                                    onClick={async () => {
+                                      const d = await act(`topics/${c.id}/decide`, {
+                                        method: "POST",
+                                        body: JSON.stringify({ decision: "accepted", reason: reason[c.id] }),
+                                      });
+                                      if (d) go("task");
+                                    }}
+                                  >
+                                    {t("Use this one", "就用这条")}
+                                  </Button>
+                                  <Button
+                                    disabled={!(reason[c.id] ?? "").trim()}
+                                    onClick={() =>
+                                      act(`topics/${c.id}/decide`, {
+                                        method: "POST",
+                                        body: JSON.stringify({ decision: "rejected", reason: reason[c.id] }),
+                                      })
+                                    }
+                                  >
+                                    {t("Pass", "跳过")}
+                                  </Button>
+                                </div>
+                              ) : c.decision_reason ? (
+                                <p className="mt-3 text-[13px]" style={{ color: "var(--ink-gray-5)" }}>
+                                  {t("You said:", "你写的理由：")} {c.decision_reason}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </List>
+                ) : null}
               </div>
-
-              {expanded ? (
-                <div
-                  className="mt-4 space-y-3 rounded-[var(--r)] p-4"
-                  style={{ background: "var(--surface-gray-2)" }}
-                >
-                  <div>
-                    <p
-                      className="text-[12.5px] font-semibold"
-                      style={{ color: "var(--ink-gray-4)" }}
-                    >
-                      {t("Why now", "为什么是现在")}
-                    </p>
-                    <p className="mt-0.5 text-[13.5px]">
-                      {zh ? c.why_zh : c.why_en}
-                    </p>
-                  </div>
-                  <div>
-                    <p
-                      className="text-[12.5px] font-semibold"
-                      style={{ color: "var(--ink-gray-4)" }}
-                    >
-                      {t("Why this score", "为什么是这个分")}
-                    </p>
-                    <p className="mt-0.5 text-[13.5px]">
-                      {zh ? c.reason_zh : c.reason_en}
-                    </p>
-                  </div>
-                  <div>
-                    <p
-                      className="text-[12.5px] font-semibold"
-                      style={{ color: "var(--ink-gray-4)" }}
-                    >
-                      {t("Based on", "依据")}
-                    </p>
-                    <ul className="mt-1 space-y-1">
-                      {mine.map((s) => (
-                        <li
-                          key={s.id}
-                          className="flex items-center gap-2 text-[13.5px]"
-                        >
-                          <Dot tone={s.trust === "high" ? "green" : "amber"} />
-                          {zh ? s.label_zh : s.label_en}
-                          <Meta>{s.published_at}</Meta>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  {myRisks.length ? (
-                    <div>
-                      <p
-                        className="text-[12.5px] font-semibold"
-                        style={{ color: "var(--ink-gray-4)" }}
-                      >
-                        {t("Watch out for", "注意")}
-                      </p>
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {myRisks.map((r) => (
-                          <Badge
-                            key={r.id}
-                            tone={LEVEL_LABEL[r.level]?.tone ?? "amber"}
-                          >
-                            {zh ? r.note_zh : r.note_en}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {!decided ? (
-                <div className="mt-4">
-                  <Field
-                    id={`r-${c.id}`}
-                    label={t("Your reason", "你的理由")}
-                    hint={t(
-                      "One line. It teaches the next round what you like.",
-                      "一句话就行。下一轮会照着你的口味来。",
-                    )}
-                  >
-                    <Input
-                      id={`r-${c.id}`}
-                      value={reason[c.id] ?? ""}
-                      onChange={(e) =>
-                        setReason((p) => ({ ...p, [c.id]: e.target.value }))
-                      }
-                      placeholder={t(
-                        "Good timing and a solid source",
-                        "时机好，来源也扎实",
-                      )}
-                    />
-                  </Field>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                      variant="solid"
-                      disabled={!(reason[c.id] ?? "").trim()}
-                      onClick={async () => {
-                        const d = await act(`topics/${c.id}/decide`, {
-                          method: "POST",
-                          body: JSON.stringify({
-                            decision: "accepted",
-                            reason: reason[c.id],
-                          }),
-                        });
-                        if (d) go("task");
-                      }}
-                    >
-                      {t("Use this one", "就用这条")}
-                    </Button>
-                    <Button
-                      disabled={!(reason[c.id] ?? "").trim()}
-                      onClick={() =>
-                        act(`topics/${c.id}/decide`, {
-                          method: "POST",
-                          body: JSON.stringify({
-                            decision: "rejected",
-                            reason: reason[c.id],
-                          }),
-                        })
-                      }
-                    >
-                      {t("Pass", "跳过")}
-                    </Button>
-                  </div>
-                </div>
-              ) : c.decision_reason ? (
-                <p
-                  className="mt-3 text-[13px]"
-                  style={{ color: "var(--ink-gray-4)" }}
-                >
-                  {t("You said:", "你写的理由：")} {c.decision_reason}
-                </p>
-              ) : null}
-            </Card>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </>
   );
 }
+
 
 /** One prominent action, chosen from where the task actually is. */
 function ActionBar({

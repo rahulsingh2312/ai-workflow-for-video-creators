@@ -446,3 +446,60 @@ a {
   border-radius: 999px;
   flex: none;
 }
+
+/* ── List ──────────────────────────────────────────────────────────────────
+   One CSS grid per row, driven by --cols. Every trailing track is a fixed
+   width so the title track is the only flexible one, which is what keeps every
+   column landing at the same x on every row.
+
+   Rows bleed one gutter wider than their content: the hover surface reaches
+   past the text into the margin while the content stays aligned with the
+   toolbar above it.
+   ------------------------------------------------------------------------- */
+
+[data-surface="app"] .list {
+  --gutter: 12px;
+  margin-inline: calc(var(--gutter) * -1);
+}
+
+[data-surface="app"] .list-row {
+  display: grid;
+  grid-template-columns: var(--cols);
+  align-items: center;
+  column-gap: 12px;
+  padding-inline: var(--gutter);
+  border-radius: var(--r-sm);
+  transition: background-color 120ms var(--e-out);
+}
+
+/* A hairline between rows, and never above the first one. */
+[data-surface="app"] .list-row + .list-row {
+  box-shadow: inset 0 1px 0 var(--outline-gray-1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-surface="app"] .list-row:hover {
+    background: var(--row-hover);
+    box-shadow: none;
+  }
+  /* Hovering a row also hides the divider above the row beneath it. */
+  [data-surface="app"] .list-row:hover + .list-row {
+    box-shadow: none;
+  }
+}
+
+[data-surface="app"] .list-row:focus-visible {
+  background: var(--row-hover);
+  box-shadow: none;
+}
+
+[data-surface="app"] .list-head {
+  display: grid;
+  grid-template-columns: var(--cols);
+  align-items: center;
+  column-gap: 12px;
+  padding-inline: var(--gutter);
+  height: 32px;
+  font-size: 12px;
+  color: var(--ink-gray-5);
+}
