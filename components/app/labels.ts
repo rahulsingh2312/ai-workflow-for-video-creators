@@ -22,12 +22,37 @@ export const STATE_LABEL: Record<string, { en: string; zh: string }> = {
  * Eleven states is the right number for a workflow engine and too many for a
  * progress bar. These are the six phases a person actually thinks in.
  */
-export const PHASES: { key: string; en: string; zh: string; states: string[] }[] = [
-  { key: "topic", en: "Topic", zh: "选题", states: ["NEW", "TOPIC_REVIEW", "TOPIC_SELECTED"] },
+export const PHASES: {
+  key: string;
+  en: string;
+  zh: string;
+  states: string[];
+}[] = [
+  {
+    key: "topic",
+    en: "Topic",
+    zh: "选题",
+    states: ["NEW", "TOPIC_REVIEW", "TOPIC_SELECTED"],
+  },
   { key: "script", en: "Script", zh: "脚本", states: ["SCRIPT_DRAFT"] },
-  { key: "review", en: "Review", zh: "审核", states: ["FACT_REVIEW", "SCRIPT_LOCKED"] },
-  { key: "produce", en: "Produce", zh: "制作", states: ["PRODUCTION", "VIDEO_READY"] },
-  { key: "publish", en: "Publish", zh: "发布", states: ["PUBLISH_PACKAGE_READY", "PUBLISHED_MANUALLY"] },
+  {
+    key: "review",
+    en: "Review",
+    zh: "审核",
+    states: ["FACT_REVIEW", "SCRIPT_LOCKED"],
+  },
+  {
+    key: "produce",
+    en: "Produce",
+    zh: "制作",
+    states: ["PRODUCTION", "VIDEO_READY"],
+  },
+  {
+    key: "publish",
+    en: "Publish",
+    zh: "发布",
+    states: ["PUBLISH_PACKAGE_READY", "PUBLISHED_MANUALLY"],
+  },
   { key: "results", en: "Results", zh: "复盘", states: ["ANALYZED"] },
 ];
 
@@ -40,16 +65,25 @@ export function stateLabel(state: string, lang: Lang) {
 }
 
 /** Resolution words a reviewer picks, said the way a person would say them. */
-export const RESOLUTION_LABEL: Record<string, { en: string; zh: string; hint: { en: string; zh: string } }> = {
+export const RESOLUTION_LABEL: Record<
+  string,
+  { en: string; zh: string; hint: { en: string; zh: string } }
+> = {
   approved: {
     en: "The claim is fine",
     zh: "这句话没问题",
-    hint: { en: "You checked it and the script can say this", zh: "你核过了，脚本可以这么说" },
+    hint: {
+      en: "You checked it and the script can say this",
+      zh: "你核过了，脚本可以这么说",
+    },
   },
   dismissed: {
     en: "Not a real problem",
     zh: "不算问题",
-    hint: { en: "The checker was wrong. Say why.", zh: "是核查判断错了，写明原因。" },
+    hint: {
+      en: "The checker was wrong. Say why.",
+      zh: "是核查判断错了，写明原因。",
+    },
   },
   revised: {
     en: "I rewrote it",
@@ -63,16 +97,22 @@ export const RESOLUTION_LABEL: Record<string, { en: string; zh: string; hint: { 
   },
 };
 
-export const LEVEL_LABEL: Record<string, { en: string; zh: string; tone: "bad" | "warn" }> = {
-  CRITICAL: { en: "Must fix", zh: "必须处理", tone: "bad" },
-  HIGH: { en: "Must fix", zh: "必须处理", tone: "bad" },
-  MEDIUM: { en: "Worth a look", zh: "值得看看", tone: "warn" },
-  LOW: { en: "Minor", zh: "小问题", tone: "warn" },
+export const LEVEL_LABEL: Record<
+  string,
+  { en: string; zh: string; tone: "red" | "amber" }
+> = {
+  CRITICAL: { en: "Must fix", zh: "必须处理", tone: "red" },
+  HIGH: { en: "Must fix", zh: "必须处理", tone: "red" },
+  MEDIUM: { en: "Worth a look", zh: "值得看看", tone: "amber" },
+  LOW: { en: "Minor", zh: "小问题", tone: "amber" },
 };
 
-export const MODE_LABEL: Record<string, { en: string; zh: string; tone: "ok" | "warn" | "bad" }> = {
-  AUTO: { en: "Sent automatically", zh: "已自动发送", tone: "ok" },
-  DRAFT: { en: "Waiting for you to send", zh: "等你点发送", tone: "warn" },
-  HANDOFF: { en: "Passed to a person", zh: "已转人工", tone: "warn" },
-  REFUSE: { en: "Declined", zh: "已拒答", tone: "bad" },
+export const MODE_LABEL: Record<
+  string,
+  { en: string; zh: string; tone: "green" | "amber" | "red" }
+> = {
+  AUTO: { en: "Sent automatically", zh: "已自动发送", tone: "green" },
+  DRAFT: { en: "Waiting for you to send", zh: "等你点发送", tone: "amber" },
+  HANDOFF: { en: "Passed to a person", zh: "已转人工", tone: "amber" },
+  REFUSE: { en: "Declined", zh: "已拒答", tone: "red" },
 };

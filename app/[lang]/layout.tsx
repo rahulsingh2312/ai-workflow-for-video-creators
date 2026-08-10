@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo, Big_Shoulders } from "next/font/google";
+import { Archivo, Big_Shoulders, Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import "../globals.css";
@@ -23,6 +23,13 @@ const bigShoulders = Big_Shoulders({
   subsets: ["latin"],
   variable: "--font-big-shoulders",
   axes: ["opsz"],
+  display: "swap",
+});
+
+/* Inter is what Frappe's desk is set in, and the workspace follows it. */
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
   display: "swap",
 });
 
@@ -81,7 +88,7 @@ export default async function RootLayout({
       lang={l === "zh" ? "zh-Hans" : "en"}
       data-theme="dark"
       suppressHydrationWarning
-      className={`${archivo.variable} ${bigShoulders.variable} ${notoSC.variable}`}
+      className={`${archivo.variable} ${bigShoulders.variable} ${inter.variable} ${notoSC.variable}`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />

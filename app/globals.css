@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../lib/frappe-tokens.css";
 
 /*
   THE INTERLOCKING
@@ -65,8 +66,11 @@
   --halo-green: rgba(31, 138, 85, 0.18);
   --halo-spread: 0px;
 
-  --shadow-lift: 0 1px 2px rgba(29, 39, 36, 0.08), 0 8px 24px -12px rgba(29, 39, 36, 0.24);
-  --shadow-plate: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 2px 10px -6px rgba(29, 39, 36, 0.3);
+  --shadow-lift:
+    0 1px 2px rgba(29, 39, 36, 0.08), 0 8px 24px -12px rgba(29, 39, 36, 0.24);
+  --shadow-plate:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 2px 10px -6px rgba(29, 39, 36, 0.3);
 
   --f-display: var(--font-big-shoulders), var(--font-noto-sc), sans-serif;
   --f-sans: var(--font-archivo), var(--font-noto-sc), system-ui, sans-serif;
@@ -97,8 +101,10 @@
   --halo-green: rgba(69, 184, 122, 0.28);
   --halo-spread: 1px;
 
-  --shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -16px rgba(0, 0, 0, 0.8);
-  --shadow-plate: 0 1px 0 rgba(233, 229, 216, 0.06) inset, 0 2px 12px -8px rgba(0, 0, 0, 0.7);
+  --shadow-lift:
+    0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -16px rgba(0, 0, 0, 0.8);
+  --shadow-plate:
+    0 1px 0 rgba(233, 229, 216, 0.06) inset, 0 2px 12px -8px rgba(0, 0, 0, 0.7);
 }
 
 /* ── The parts of the browser we did not draw still belong to the panel ───── */
@@ -236,109 +242,112 @@ a {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   THE APP SURFACE
+   THE APP SURFACE  ·  Frappe UI
 
    The marketing site is a signalling diagram, because its job is to argue.
-   The workspace's job is to get work done, so it drops the costume: plain
-   language, real hierarchy, generous space, and colour reserved for status.
-
-   Same product truth, same three status meanings, different register.
+   The workspace is a tool, so it uses the design language its users already
+   work in every day: Frappe's desk. Colour tokens come straight from the
+   frappe-ui package; the scale, radii, shadows and type below match their
+   Tailwind preset.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 [data-surface="app"] {
-  --bg: #f7f8fa;
-  --surface: #ffffff;
-  --surface-2: #f2f4f7;
-  --surface-3: #e9ecf1;
-  --line: #e3e6eb;
-  --line-strong: #d2d7df;
-  --ink: #101319;
-  --ink-2: #565e6d;
-  --ink-3: #8b93a1;
+  /* Frappe's radius scale */
+  --r-sm: 4px;
+  --r: 8px;
+  --r-md: 10px;
+  --r-lg: 12px;
+  --r-xl: 16px;
 
-  --ok: #0d8a5f;
-  --ok-bg: #e6f6ef;
-  --ok-line: #a9e0c9;
-  --warn: #9a5b06;
-  --warn-bg: #fdf2e2;
-  --warn-line: #f2d0a0;
-  --bad: #c8342e;
-  --bad-bg: #fdeceb;
-  --bad-line: #f4c3c0;
+  /* Frappe's elevation scale */
+  --sh-sm: 0px 1px 2px rgba(0, 0, 0, 0.1);
+  --sh: 0px 0px 1px rgba(0, 0, 0, 0.45), 0px 1px 2px rgba(0, 0, 0, 0.1);
+  --sh-md:
+    0px 0px 1px rgba(0, 0, 0, 0.12), 0px 0.5px 2px rgba(0, 0, 0, 0.15),
+    0px 2px 3px rgba(0, 0, 0, 0.16);
+  --sh-lg: 0px 0px 1px rgba(0, 0, 0, 0.35), 0px 6px 8px -4px rgba(0, 0, 0, 0.1);
 
-  --brand: #101319;
-  --brand-ink: #ffffff;
-
-  --ring: rgba(16, 19, 25, 0.12);
-  --shadow-1: 0 1px 2px rgba(16, 19, 25, 0.06), 0 1px 3px rgba(16, 19, 25, 0.04);
-  --shadow-2: 0 2px 4px rgba(16, 19, 25, 0.05), 0 8px 20px -8px rgba(16, 19, 25, 0.16);
-  --shadow-pop: 0 10px 32px -12px rgba(16, 19, 25, 0.28);
-
-  --r-sm: 8px;
-  --r: 12px;
-  --r-lg: 16px;
+  --e-out: cubic-bezier(0.23, 1, 0.32, 1);
 
   color-scheme: light;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--f-sans);
+  background: var(--surface-white);
+  color: var(--ink-gray-8);
+  /* Inter at 420: Frappe's base weight, a touch heavier than regular. */
+  font-family: var(--font-inter), var(--font-noto-sc), system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 420;
+  letter-spacing: 0.02em;
+  font-feature-settings: "cv05", "cv09", "ss03";
 }
 
 [data-theme="dark"] [data-surface="app"] {
-  --bg: #0b0c0f;
-  --surface: #15171c;
-  --surface-2: #1b1e24;
-  --surface-3: #22262e;
-  --line: #262a33;
-  --line-strong: #333945;
-  --ink: #f0f2f5;
-  --ink-2: #9aa2b1;
-  --ink-3: #6c7484;
-
-  --ok: #3ecf8e;
-  --ok-bg: rgba(62, 207, 142, 0.12);
-  --ok-line: rgba(62, 207, 142, 0.3);
-  --warn: #f5b544;
-  --warn-bg: rgba(245, 181, 68, 0.12);
-  --warn-line: rgba(245, 181, 68, 0.3);
-  --bad: #ff6b63;
-  --bad-bg: rgba(255, 107, 99, 0.12);
-  --bad-line: rgba(255, 107, 99, 0.32);
-
-  --brand: #f0f2f5;
-  --brand-ink: #101319;
-
-  --ring: rgba(240, 242, 245, 0.16);
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 28px -12px rgba(0, 0, 0, 0.7);
-  --shadow-pop: 0 16px 40px -16px rgba(0, 0, 0, 0.8);
-
   color-scheme: dark;
+  --sh-sm: 0px 1px 2px rgba(0, 0, 0, 0.4);
+  --sh: 0px 0px 1px rgba(0, 0, 0, 0.8), 0px 1px 2px rgba(0, 0, 0, 0.5);
+  --sh-md: 0px 0px 1px rgba(0, 0, 0, 0.6), 0px 2px 4px rgba(0, 0, 0, 0.5);
+  --sh-lg: 0px 0px 1px rgba(0, 0, 0, 0.7), 0px 6px 12px -4px rgba(0, 0, 0, 0.6);
 }
 
-/* Type inside the app: one workhorse, sentence case, real steps in scale. */
-[data-surface="app"] h1,
-[data-surface="app"] h2,
-[data-surface="app"] h3 {
-  font-family: var(--f-sans);
-  letter-spacing: -0.018em;
-  text-wrap: balance;
+/* Frappe's type scale. Tight leading, slight tracking, 420 base weight. */
+[data-surface="app"] .t-2xs {
+  font-size: 11px;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
 }
+[data-surface="app"] .t-xs {
+  font-size: 12px;
+  line-height: 1.15;
+}
+[data-surface="app"] .t-sm {
+  font-size: 13px;
+  line-height: 1.15;
+}
+[data-surface="app"] .t-base {
+  font-size: 14px;
+  line-height: 1.15;
+}
+[data-surface="app"] .t-lg {
+  font-size: 16px;
+  line-height: 1.15;
+  font-weight: 400;
+}
+[data-surface="app"] .t-xl {
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 500;
+}
+[data-surface="app"] .t-2xl {
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
 [data-surface="app"] ::selection {
-  background: var(--ink);
-  color: var(--surface);
+  background: var(--surface-gray-3);
 }
 [data-surface="app"] :focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  outline: 2px solid var(--outline-gray-3);
+  outline-offset: 1px;
   border-radius: var(--r-sm);
 }
-[data-surface="app"] input::placeholder,
-[data-surface="app"] textarea::placeholder {
-  color: var(--ink-3);
-}
 [data-surface="app"] :lang(zh) {
-  line-height: 1.75;
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+
+/* Scrollbars belong to the surface too. */
+[data-surface="app"] ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+[data-surface="app"] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-surface="app"] ::-webkit-scrollbar-thumb {
+  background: var(--surface-gray-4);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
 }
 
 @keyframes app-rise {
@@ -352,59 +361,27 @@ a {
   }
 }
 .app-rise {
-  animation: app-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: app-rise 220ms var(--e-out) both;
 }
-
-/* ── App motion ────────────────────────────────────────────────────────────
-   Built-in CSS easings are too weak to read as intentional. These are the
-   stronger variants, and every transition in the app names the properties it
-   animates rather than reaching for `all`.
-   ------------------------------------------------------------------------- */
-
-[data-surface="app"] {
-  --e-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --e-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-}
-
-/* Entering, so ease-out: the movement starts fast, where the eye is watching. */
-@keyframes app-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.app-rise {
+.app-stagger > * {
   animation: app-rise 260ms var(--e-out) both;
 }
-
-/*
-  Cards cascade rather than landing together. Short delays only: past about
-  80ms apiece the page starts to feel like it is loading slowly.
-*/
-.app-stagger > * {
-  animation: app-rise 300ms var(--e-out) both;
+.app-stagger > *:nth-child(1) {
+  animation-delay: 0ms;
 }
-.app-stagger > *:nth-child(1) { animation-delay: 0ms; }
-.app-stagger > *:nth-child(2) { animation-delay: 40ms; }
-.app-stagger > *:nth-child(3) { animation-delay: 80ms; }
-.app-stagger > *:nth-child(4) { animation-delay: 120ms; }
-.app-stagger > *:nth-child(n + 5) { animation-delay: 160ms; }
-
-/* Touch devices fire hover on tap and keep it, so gate every hover effect. */
-@media (hover: hover) and (pointer: fine) {
-  [data-surface="app"] .hoverable:hover {
-    background: var(--surface-2);
-  }
+.app-stagger > *:nth-child(2) {
+  animation-delay: 35ms;
+}
+.app-stagger > *:nth-child(3) {
+  animation-delay: 70ms;
+}
+.app-stagger > *:nth-child(4) {
+  animation-delay: 105ms;
+}
+.app-stagger > *:nth-child(n + 5) {
+  animation-delay: 140ms;
 }
 
-/*
-  Reduced motion means fewer and gentler, not none. Opacity still carries the
-  meaning of something arriving; the movement is what goes.
-*/
 @media (prefers-reduced-motion: reduce) {
   [data-surface="app"] .app-rise,
   [data-surface="app"] .app-stagger > * {
@@ -412,4 +389,60 @@ a {
     opacity: 1 !important;
     transform: none !important;
   }
+}
+
+/* ── Desk surface, matching the Frappe tasks demo ──────────────────────────
+   Rows carry no separators. Grouping comes from whitespace and a heading, and
+   the only thing that changes on hover is a soft rounded band. Colour lives in
+   6px dots on the chips; everything else is grey.
+   ------------------------------------------------------------------------- */
+
+[data-surface="app"] {
+  --rail: var(--surface-gray-1);
+  --rail-active: var(--surface-gray-3);
+  --row-hover: var(--surface-gray-2);
+}
+
+[data-theme="dark"] [data-surface="app"] {
+  --rail: #141414;
+  --row-hover: #1e1e1e;
+  --rail-active: #262626;
+  background: #191919;
+}
+
+[data-surface="app"] .row {
+  border-radius: var(--r);
+  transition: background-color 120ms var(--e-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  [data-surface="app"] .row:hover {
+    background: var(--row-hover);
+  }
+}
+[data-surface="app"] .row[data-active="true"] {
+  background: var(--row-hover);
+}
+
+/* Chips: pill, quiet fill, one small dot doing all the colour work. */
+[data-surface="app"] .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 3px 10px 3px 8px;
+  font-size: 13px;
+  line-height: 1.2;
+  background: var(--surface-gray-2);
+  color: var(--ink-gray-7);
+  white-space: nowrap;
+}
+[data-theme="dark"] [data-surface="app"] .chip {
+  background: #262626;
+  color: #b4b4b4;
+}
+[data-surface="app"] .chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex: none;
 }

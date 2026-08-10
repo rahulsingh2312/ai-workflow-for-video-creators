@@ -4,63 +4,96 @@ import type { LucideIcon } from "lucide-react";
 import { Check, Loader2 } from "lucide-react";
 import { clsx } from "@/lib/clsx";
 
-export type Tone = "ok" | "warn" | "bad" | "neutral";
+/*
+  Components in Frappe UI's grammar: small radii, hairline outlines, a solid
+  near-black primary, subtle gray for everything else, and a compact scale
+  where 13px is a normal label rather than fine print.
+*/
 
-const TONE_VARS: Record<Tone, { fg: string; bg: string; line: string }> = {
-  ok: { fg: "var(--ok)", bg: "var(--ok-bg)", line: "var(--ok-line)" },
-  warn: { fg: "var(--warn)", bg: "var(--warn-bg)", line: "var(--warn-line)" },
-  bad: { fg: "var(--bad)", bg: "var(--bad-bg)", line: "var(--bad-line)" },
-  neutral: { fg: "var(--ink-2)", bg: "var(--surface-2)", line: "var(--line)" },
+export type Tone = "gray" | "green" | "red" | "amber" | "blue";
+
+const TONE: Record<Tone, { ink: string; surface: string; outline: string }> = {
+  gray: {
+    ink: "var(--ink-gray-7)",
+    surface: "var(--surface-gray-2)",
+    outline: "var(--outline-gray-1)",
+  },
+  green: {
+    ink: "var(--ink-green-3)",
+    surface: "var(--surface-green-2)",
+    outline: "var(--outline-green-1)",
+  },
+  red: {
+    ink: "var(--ink-red-4)",
+    surface: "var(--surface-red-2)",
+    outline: "var(--outline-red-1)",
+  },
+  amber: {
+    ink: "var(--ink-amber-3)",
+    surface: "var(--surface-amber-2)",
+    outline: "var(--outline-amber-1)",
+  },
+  blue: {
+    ink: "var(--ink-blue-3)",
+    surface: "var(--surface-blue-2)",
+    outline: "var(--outline-blue-1)",
+  },
 };
 
-/* ── Buttons ─────────────────────────────────────────────────────────────── */
+/* ── Button ──────────────────────────────────────────────────────────────── */
+
+export type ButtonVariant = "solid" | "subtle" | "outline" | "ghost" | "danger";
+
+const SIZE = {
+  sm: "h-7 px-2 gap-1.5 t-xs rounded-[var(--r-sm)]",
+  md: "h-8 px-2.5 gap-1.5 t-sm rounded-[var(--r-sm)]",
+  lg: "h-10 px-4 gap-2 t-base rounded-[var(--r)]",
+} as const;
 
 export function Button({
   children,
   onClick,
-  variant = "secondary",
+  variant = "subtle",
   size = "md",
   icon: Icon,
+  iconRight: IconRight,
   disabled,
   loading,
   type = "button",
   title,
   full,
+  className,
 }: {
   children?: React.ReactNode;
   onClick?: () => void;
-  variant?: "primary" | "secondary" | "ghost" | "danger";
-  size?: "sm" | "md" | "lg";
+  variant?: ButtonVariant;
+  size?: keyof typeof SIZE;
   icon?: LucideIcon;
+  iconRight?: LucideIcon;
   disabled?: boolean;
   loading?: boolean;
   type?: "button" | "submit";
   title?: string;
   full?: boolean;
+  className?: string;
 }) {
-  /*
-    Named properties only: `all` would animate layout too. 160ms is the press
-    window where feedback still reads as instant, and 0.97 is enough scale to
-    feel the interface heard you without looking like a bounce.
-  */
-  const base =
-    "inline-flex items-center justify-center gap-2 rounded-[10px] font-medium " +
-    "[transition:transform_160ms_var(--e-out),background-color_160ms_var(--e-out),box-shadow_160ms_var(--e-out),opacity_160ms_var(--e-out)] " +
-    "active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100";
-  const sizes = {
-    sm: "h-8 px-3 text-[13px]",
-    md: "h-10 px-4 text-[14px]",
-    lg: "h-11 px-5 text-[15px]",
-  }[size];
-
   const styles: React.CSSProperties =
-    variant === "primary"
-      ? { background: "var(--brand)", color: "var(--brand-ink)", boxShadow: "var(--shadow-1)" }
-      : variant === "danger"
-        ? { background: "var(--bad-bg)", color: "var(--bad)", border: "1px solid var(--bad-line)" }
+    variant === "solid"
+      ? { background: "var(--surface-gray-7)", color: "var(--ink-white)" }
+      : variant === "outline"
+        ? {
+            background: "var(--surface-white)",
+            color: "var(--ink-gray-8)",
+            boxShadow: "0 0 0 1px var(--outline-gray-2)",
+          }
         : variant === "ghost"
-          ? { background: "transparent", color: "var(--ink-2)" }
-          : { background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--line-strong)", boxShadow: "var(--shadow-1)" };
+          ? { background: "transparent", color: "var(--ink-gray-7)" }
+          : variant === "danger"
+            ? { background: "var(--surface-red-2)", color: "var(--ink-red-4)" }
+            : {
+                background: "var(--surface-gray-2)",
+                color: "var(--ink-gray-8)",
+              };
 
   return (
     <button
@@ -70,22 +103,71 @@ export function Button({
       title={title}
       style={styles}
       className={clsx(
-        base,
-        sizes,
+        "inline-flex shrink-0 items-center justify-center whitespace-nowrap font-medium",
+        "[transition:background-color_150ms_var(--e-out),box-shadow_150ms_var(--e-out),opacity_150ms_var(--e-out),transform_120ms_var(--e-out)]",
+        "active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100",
+        SIZE[size],
         full && "w-full",
-        variant === "secondary" && "[@media(hover:hover)and(pointer:fine)]:hover:brightness-[0.97]",
-        variant === "ghost" && "[@media(hover:hover)and(pointer:fine)]:hover:bg-[var(--surface-2)] [@media(hover:hover)and(pointer:fine)]:hover:text-[var(--ink)]",
-        variant === "primary" && "[@media(hover:hover)and(pointer:fine)]:hover:opacity-90",
-        variant === "danger" && "[@media(hover:hover)and(pointer:fine)]:hover:brightness-[0.97]",
+        "[@media(hover:hover)and(pointer:fine)]:hover:brightness-[0.96]",
+        variant === "ghost" &&
+          "[@media(hover:hover)and(pointer:fine)]:hover:bg-[var(--surface-gray-2)]",
+        className,
       )}
     >
       {loading ? (
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        <Loader2
+          className={
+            size === "lg" ? "h-4 w-4 animate-spin" : "h-3.5 w-3.5 animate-spin"
+          }
+          aria-hidden
+        />
       ) : Icon ? (
-        <Icon className={size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"} aria-hidden />
+        <Icon
+          className={size === "lg" ? "h-4 w-4" : "h-3.5 w-3.5"}
+          aria-hidden
+        />
       ) : null}
       {children}
+      {IconRight ? (
+        <IconRight
+          className={size === "lg" ? "h-4 w-4" : "h-3.5 w-3.5"}
+          aria-hidden
+        />
+      ) : null}
     </button>
+  );
+}
+
+/* ── Badge ───────────────────────────────────────────────────────────────── */
+
+export function Badge({
+  children,
+  tone = "gray",
+  icon: Icon,
+}: {
+  children: React.ReactNode;
+  tone?: Tone;
+  icon?: LucideIcon;
+}) {
+  const c = TONE[tone];
+  return (
+    <span
+      style={{ background: c.surface, color: c.ink }}
+      className="t-xs inline-flex items-center gap-1 whitespace-nowrap rounded-[var(--r-sm)] px-1.5 py-0.5 font-medium"
+    >
+      {Icon ? <Icon className="h-3 w-3" aria-hidden /> : null}
+      {children}
+    </span>
+  );
+}
+
+export function Dot({ tone = "gray" }: { tone?: Tone }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+      style={{ background: TONE[tone].ink }}
+    />
   );
 }
 
@@ -103,14 +185,12 @@ export function Card({
   return (
     <section
       style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--r-lg)",
-        boxShadow: "var(--shadow-1)",
+        background: "var(--surface-white)",
+        boxShadow: "0 0 0 1px var(--outline-gray-1)",
       }}
-      className={clsx("min-w-0 overflow-hidden", className)}
+      className={clsx("min-w-0 overflow-hidden rounded-[var(--r)]", className)}
     >
-      <div className={padded ? "p-5" : undefined}>{children}</div>
+      <div className={padded ? "p-4" : undefined}>{children}</div>
     </section>
   );
 }
@@ -118,30 +198,26 @@ export function Card({
 export function CardHeader({
   title,
   subtitle,
-  icon: Icon,
   action,
 }: {
   title: string;
   subtitle?: string;
-  icon?: LucideIcon;
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-4 flex items-start gap-3">
-      {Icon ? (
-        <span
-          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
-          style={{ background: "var(--surface-2)", color: "var(--ink-2)" }}
-        >
-          <Icon className="h-4 w-4" aria-hidden />
-        </span>
-      ) : null}
+    <div className="mb-3 flex items-start gap-3">
       <div className="min-w-0 flex-1">
-        <h3 className="text-[15px] font-semibold" style={{ color: "var(--ink)" }}>
+        <h3
+          className="t-base font-medium"
+          style={{ color: "var(--ink-gray-9)" }}
+        >
           {title}
         </h3>
         {subtitle ? (
-          <p className="mt-0.5 text-[13px] leading-snug" style={{ color: "var(--ink-3)" }}>
+          <p
+            className="t-xs mt-1 leading-normal"
+            style={{ color: "var(--ink-gray-5)" }}
+          >
             {subtitle}
           </p>
         ) : null}
@@ -151,77 +227,100 @@ export function CardHeader({
   );
 }
 
-/* ── Status ──────────────────────────────────────────────────────────────── */
+/** The bar across the top of every page: where you are on the left, what you can do on the right. */
+export function PageHeader({
+  breadcrumb,
+  actions,
+}: {
+  breadcrumb: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <header
+      className="sticky top-0 z-10 flex h-[52px] items-center gap-3 px-4 sm:px-5"
+      style={{
+        background: "var(--surface-white)",
+        borderBottom: "1px solid var(--outline-gray-1)",
+      }}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        {breadcrumb}
+      </div>
+      {actions ? (
+        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+      ) : null}
+    </header>
+  );
+}
 
-export function Badge({
+/* ── List rows ───────────────────────────────────────────────────────────── */
+
+export function ListRow({
   children,
-  tone = "neutral",
-  icon: Icon,
-  size = "md",
+  onClick,
+  className,
 }: {
   children: React.ReactNode;
-  tone?: Tone;
-  icon?: LucideIcon;
-  size?: "sm" | "md";
+  onClick?: () => void;
+  className?: string;
 }) {
-  const v = TONE_VARS[tone];
-  return (
-    <span
-      style={{ background: v.bg, color: v.fg, border: `1px solid ${v.line}` }}
+  const inner = (
+    <div
       className={clsx(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-medium",
-        size === "sm" ? "px-2 py-0.5 text-[11.5px]" : "px-2.5 py-1 text-[12.5px]",
+        "flex w-full items-center gap-3 px-4 py-2.5 text-left",
+        onClick &&
+          "[transition:background-color_120ms_var(--e-out)] [@media(hover:hover)and(pointer:fine)]:hover:bg-[var(--surface-gray-1)]",
+        className,
       )}
+      style={{ borderBottom: "1px solid var(--outline-gray-1)" }}
     >
-      {Icon ? <Icon className="h-3.5 w-3.5" aria-hidden /> : null}
       {children}
-    </span>
+    </div>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} className="block w-full">
+      {inner}
+    </button>
+  ) : (
+    inner
   );
 }
 
-export function Dot({ tone = "neutral" }: { tone?: Tone }) {
-  return (
-    <span
-      aria-hidden
-      className="inline-block h-2 w-2 shrink-0 rounded-full"
-      style={{ background: TONE_VARS[tone].fg }}
-    />
-  );
-}
-
-/** A requirement, shown the way a person reads one: done or not, and why. */
+/** A requirement: done or not, and what the system actually found. */
 export function CheckRow({
   done,
   children,
   detail,
-  tone = "bad",
 }: {
   done: boolean;
   children: React.ReactNode;
   detail?: string;
-  tone?: Tone;
 }) {
   return (
-    <li className="flex items-start gap-3 py-2">
+    <li className="flex items-start gap-2.5 py-1.5">
       <span
-        className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+        className="mt-[1px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
         style={{
-          background: done ? "var(--ok-bg)" : TONE_VARS[tone].bg,
-          color: done ? "var(--ok)" : TONE_VARS[tone].fg,
-          border: `1px solid ${done ? "var(--ok-line)" : TONE_VARS[tone].line}`,
+          background: done ? "var(--surface-green-2)" : "var(--surface-red-2)",
+          color: done ? "var(--ink-green-3)" : "var(--ink-red-4)",
         }}
       >
-        {done ? <Check className="h-3 w-3" strokeWidth={3} aria-hidden /> : null}
+        {done ? (
+          <Check className="h-2.5 w-2.5" strokeWidth={3.5} aria-hidden />
+        ) : null}
       </span>
       <span className="min-w-0 flex-1">
         <span
-          className="block text-[14px] leading-snug"
-          style={{ color: done ? "var(--ink-2)" : "var(--ink)" }}
+          className="t-sm block leading-normal"
+          style={{ color: done ? "var(--ink-gray-6)" : "var(--ink-gray-8)" }}
         >
           {children}
         </span>
         {detail ? (
-          <span className="mt-0.5 block text-[12.5px]" style={{ color: "var(--ink-3)" }}>
+          <span
+            className="t-xs mt-0.5 block"
+            style={{ color: "var(--ink-gray-4)" }}
+          >
             {detail}
           </span>
         ) : null}
@@ -247,17 +346,21 @@ export function Field({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-[13px] font-medium" style={{ color: "var(--ink)" }}>
+      <label
+        htmlFor={id}
+        className="t-xs block font-medium"
+        style={{ color: "var(--ink-gray-6)" }}
+      >
         {label}
       </label>
       {hint ? (
-        <p className="mt-0.5 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
+        <p className="t-xs mt-0.5" style={{ color: "var(--ink-gray-4)" }}>
           {hint}
         </p>
       ) : null}
-      <div className="mt-2">{children}</div>
+      <div className="mt-1.5">{children}</div>
       {error ? (
-        <p className="mt-1.5 text-[12.5px]" style={{ color: "var(--bad)" }}>
+        <p className="t-xs mt-1" style={{ color: "var(--ink-red-4)" }}>
           {error}
         </p>
       ) : null}
@@ -265,60 +368,43 @@ export function Field({
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  background: "var(--surface)",
-  border: "1px solid var(--line-strong)",
-  borderRadius: "10px",
-  color: "var(--ink)",
+/*
+  Frappe inputs sit on a filled gray field with no visible border until you
+  focus them, which keeps a dense form from turning into a grid of boxes.
+*/
+const controlClass =
+  "w-full rounded-[var(--r-sm)] px-2 t-sm outline-none " +
+  "[transition:background-color_120ms_var(--e-out),box-shadow_120ms_var(--e-out)] " +
+  "focus:bg-[var(--surface-white)] focus:shadow-[0_0_0_1px_var(--outline-gray-3)]";
+
+const controlStyle: React.CSSProperties = {
+  background: "var(--surface-gray-2)",
+  color: "var(--ink-gray-8)",
 };
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      style={{ ...inputStyle, ...props.style }}
-      className={clsx("h-10 w-full px-3 text-[14px] outline-none", props.className)}
+      style={{ ...controlStyle, ...props.style }}
+      className={clsx("h-8", controlClass, props.className)}
     />
   );
 }
 
-export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea(
+  props: React.TextareaHTMLAttributes<HTMLTextAreaElement>,
+) {
   return (
     <textarea
       {...props}
-      style={{ ...inputStyle, ...props.style }}
-      className={clsx("w-full px-3 py-2.5 text-[14px] leading-relaxed outline-none", props.className)}
+      style={{ ...controlStyle, ...props.style }}
+      className={clsx("py-2 leading-normal", controlClass, props.className)}
     />
   );
 }
 
-/* ── Layout bits ─────────────────────────────────────────────────────────── */
-
-export function PageTitle({
-  title,
-  subtitle,
-  action,
-}: {
-  title: string;
-  subtitle?: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="text-[26px] font-semibold leading-tight" style={{ color: "var(--ink)" }}>
-          {title}
-        </h1>
-        {subtitle ? (
-          <p className="mt-1.5 max-w-[62ch] text-[14px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
-            {subtitle}
-          </p>
-        ) : null}
-      </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </div>
-  );
-}
+/* ── States ──────────────────────────────────────────────────────────────── */
 
 export function EmptyState({
   icon: Icon,
@@ -328,39 +414,87 @@ export function EmptyState({
 }: {
   icon: LucideIcon;
   title: string;
-  body: string;
+  body?: string;
   action?: React.ReactNode;
 }) {
   return (
-    <div
-      className="flex flex-col items-center justify-center rounded-[var(--r-lg)] px-6 py-14 text-center"
-      style={{ background: "var(--surface-2)", border: "1px dashed var(--line-strong)" }}
-    >
-      <span
-        className="flex h-11 w-11 items-center justify-center rounded-full"
-        style={{ background: "var(--surface)", color: "var(--ink-3)", boxShadow: "var(--shadow-1)" }}
-      >
-        <Icon className="h-5 w-5" aria-hidden />
-      </span>
-      <h3 className="mt-4 text-[16px] font-semibold" style={{ color: "var(--ink)" }}>
+    <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+      <Icon
+        className="h-9 w-9"
+        strokeWidth={1.25}
+        style={{ color: "var(--ink-gray-3)" }}
+        aria-hidden
+      />
+      <p className="t-base mt-4" style={{ color: "var(--ink-gray-6)" }}>
         {title}
-      </h3>
-      <p className="mt-1.5 max-w-[46ch] text-[13.5px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
-        {body}
       </p>
-      {action ? <div className="mt-5">{action}</div> : null}
+      {body ? (
+        <p
+          className="t-sm mt-1.5 max-w-[44ch] leading-normal"
+          style={{ color: "var(--ink-gray-4)" }}
+        >
+          {body}
+        </p>
+      ) : null}
+      {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
 }
 
 export function Meta({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[12.5px]" style={{ color: "var(--ink-3)" }}>
+    <span className="t-xs" style={{ color: "var(--ink-gray-4)" }}>
       {children}
     </span>
   );
 }
 
 export function Divider() {
-  return <div className="my-4 h-px w-full" style={{ background: "var(--line)" }} />;
+  return (
+    <div
+      className="my-3 h-px w-full"
+      style={{ background: "var(--outline-gray-1)" }}
+    />
+  );
+}
+
+export function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      className="t-xs mb-1.5 font-medium"
+      style={{ color: "var(--ink-gray-5)" }}
+    >
+      {children}
+    </p>
+  );
+}
+
+/** Title block at the top of a page body. Compact, like the rest of the desk. */
+export function PageHead({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="t-xl" style={{ color: "var(--ink-gray-9)" }}>
+          {title}
+        </h1>
+        {subtitle ? (
+          <p
+            className="t-sm mt-1 max-w-[70ch] leading-normal"
+            style={{ color: "var(--ink-gray-5)" }}
+          >
+            {subtitle}
+          </p>
+        ) : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  );
 }
