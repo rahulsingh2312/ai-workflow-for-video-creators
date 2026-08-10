@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+data
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env*
+!.env.example
+.DS_Store
+.vercel
+.impeccable/review
+assets/NotoSansSC.ttf
+app/fonts/.subset-charset.txt

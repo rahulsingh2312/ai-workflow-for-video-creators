@@ -1,0 +1,415 @@
+@import "tailwindcss";
+
+/*
+  THE INTERLOCKING
+  Two renditions of one diagram.
+
+  Dark  = the illuminated dispatch panel. Vitreous enamel grey-green, track
+          lines engraved in bone, signal aspects burning through it.
+  Light = the same scheme plan, printed. Drafting paper, ink line, the aspects
+          held as printed lamp colour.
+
+  Exactly three saturated colours exist in this system and all three are signal
+  aspects: red (at danger), amber (caution), green (clear). Nothing decorative
+  is ever coloured. If it's saturated, it's carrying state.
+*/
+
+@theme inline {
+  --color-panel: var(--panel);
+  --color-panel-deep: var(--panel-deep);
+  --color-panel-raised: var(--panel-raised);
+  --color-panel-inset: var(--panel-inset);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-bone: var(--bone);
+  --color-bone-dim: var(--bone-dim);
+  --color-bone-faint: var(--bone-faint);
+
+  --color-lamp-red: var(--lamp-red);
+  --color-lamp-amber: var(--lamp-amber);
+  --color-lamp-green: var(--lamp-green);
+  --color-fg-red: var(--fg-red);
+  --color-fg-amber: var(--fg-amber);
+  --color-fg-green: var(--fg-green);
+
+  --font-display: var(--f-display);
+  --font-sans: var(--f-sans);
+
+  --ease-lamp: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-clack: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  color-scheme: light;
+
+  --panel: #edebe3;
+  --panel-deep: #e2dfd4;
+  --panel-raised: #f7f6f0;
+  --panel-inset: #e7e4da;
+  --rule: #c6c2b3;
+  --rule-strong: #a19c8b;
+  --bone: #1d2724;
+  --bone-dim: #566059;
+  --bone-faint: #626b65;
+
+  --lamp-red: #c42b3c;
+  --lamp-amber: #d98a11;
+  --lamp-green: #1f8a55;
+  --fg-red: #a81e2e;
+  --fg-amber: #7d4a08;
+  --fg-green: #146143;
+
+  /* Lamp halo. A real signal lamp throws light onto the panel around it. */
+  --halo-red: rgba(196, 43, 60, 0.18);
+  --halo-amber: rgba(217, 138, 17, 0.2);
+  --halo-green: rgba(31, 138, 85, 0.18);
+  --halo-spread: 0px;
+
+  --shadow-lift: 0 1px 2px rgba(29, 39, 36, 0.08), 0 8px 24px -12px rgba(29, 39, 36, 0.24);
+  --shadow-plate: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 2px 10px -6px rgba(29, 39, 36, 0.3);
+
+  --f-display: var(--font-big-shoulders), var(--font-noto-sc), sans-serif;
+  --f-sans: var(--font-archivo), var(--font-noto-sc), system-ui, sans-serif;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --panel: #22302c;
+  --panel-deep: #1a2522;
+  --panel-raised: #2a3a35;
+  --panel-inset: #16201d;
+  --rule: #3b4e48;
+  --rule-strong: #526660;
+  --bone: #e9e5d8;
+  --bone-dim: #9aa69f;
+  --bone-faint: #8b968f;
+
+  --lamp-red: #e03e4e;
+  --lamp-amber: #eda53c;
+  --lamp-green: #45b87a;
+  --fg-red: #f4757f;
+  --fg-amber: #eda53c;
+  --fg-green: #45b87a;
+
+  --halo-red: rgba(224, 62, 78, 0.3);
+  --halo-amber: rgba(237, 165, 60, 0.32);
+  --halo-green: rgba(69, 184, 122, 0.28);
+  --halo-spread: 1px;
+
+  --shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -16px rgba(0, 0, 0, 0.8);
+  --shadow-plate: 0 1px 0 rgba(233, 229, 216, 0.06) inset, 0 2px 12px -8px rgba(0, 0, 0, 0.7);
+}
+
+/* ── The parts of the browser we did not draw still belong to the panel ───── */
+
+::selection {
+  background: var(--lamp-amber);
+  color: var(--panel-deep);
+}
+
+html {
+  scrollbar-color: var(--rule-strong) var(--panel-deep);
+  scrollbar-width: thin;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: var(--panel-deep);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--rule-strong);
+  border: 3px solid var(--panel-deep);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bone-faint);
+}
+
+body {
+  background: var(--panel);
+  color: var(--bone);
+  font-family: var(--f-sans);
+  caret-color: var(--lamp-amber);
+  font-synthesis-weight: none;
+  font-synthesis-style: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+:focus-visible {
+  outline: 2px solid var(--lamp-amber);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+a {
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: from-font;
+}
+
+/* Chinese needs more air between lines and no synthesised slant, ever. */
+:lang(zh) {
+  line-height: 1.85;
+  font-synthesis: none;
+}
+:lang(zh) .measure {
+  max-width: 34em;
+}
+
+.measure {
+  max-width: 68ch;
+}
+
+/* ── Type roles ───────────────────────────────────────────────────────────── */
+
+.display {
+  font-family: var(--f-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.022em;
+  line-height: 0.92;
+  text-wrap: balance;
+}
+:lang(zh) .display {
+  letter-spacing: 0.01em;
+  line-height: 1.18;
+  font-weight: 800;
+}
+
+/*
+  Signage lettering. Archivo's width axis is doing what DIN 1451 does with
+  Engschrift and Mittelschrift: one design, narrowed for the plate.
+*/
+.plate {
+  font-family: var(--f-sans);
+  font-variation-settings: "wdth" 78;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+:lang(zh) .plate {
+  font-variation-settings: normal;
+  letter-spacing: 0.14em;
+  text-transform: none;
+}
+
+/* Measured values: counts, scores, timestamps, codes. Always tabular. */
+.data {
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-variation-settings: "wdth" 88;
+  letter-spacing: 0.01em;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── The line itself ──────────────────────────────────────────────────────── */
+
+.lamp {
+  transition:
+    background-color 420ms var(--ease-lamp),
+    box-shadow 420ms var(--ease-lamp),
+    opacity 420ms var(--ease-lamp);
+}
+
+.engraved {
+  box-shadow:
+    0 1px 0 var(--panel-raised),
+    0 -1px 0 var(--panel-inset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE APP SURFACE
+
+   The marketing site is a signalling diagram, because its job is to argue.
+   The workspace's job is to get work done, so it drops the costume: plain
+   language, real hierarchy, generous space, and colour reserved for status.
+
+   Same product truth, same three status meanings, different register.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+[data-surface="app"] {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f2f4f7;
+  --surface-3: #e9ecf1;
+  --line: #e3e6eb;
+  --line-strong: #d2d7df;
+  --ink: #101319;
+  --ink-2: #565e6d;
+  --ink-3: #8b93a1;
+
+  --ok: #0d8a5f;
+  --ok-bg: #e6f6ef;
+  --ok-line: #a9e0c9;
+  --warn: #9a5b06;
+  --warn-bg: #fdf2e2;
+  --warn-line: #f2d0a0;
+  --bad: #c8342e;
+  --bad-bg: #fdeceb;
+  --bad-line: #f4c3c0;
+
+  --brand: #101319;
+  --brand-ink: #ffffff;
+
+  --ring: rgba(16, 19, 25, 0.12);
+  --shadow-1: 0 1px 2px rgba(16, 19, 25, 0.06), 0 1px 3px rgba(16, 19, 25, 0.04);
+  --shadow-2: 0 2px 4px rgba(16, 19, 25, 0.05), 0 8px 20px -8px rgba(16, 19, 25, 0.16);
+  --shadow-pop: 0 10px 32px -12px rgba(16, 19, 25, 0.28);
+
+  --r-sm: 8px;
+  --r: 12px;
+  --r-lg: 16px;
+
+  color-scheme: light;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-sans);
+}
+
+[data-theme="dark"] [data-surface="app"] {
+  --bg: #0b0c0f;
+  --surface: #15171c;
+  --surface-2: #1b1e24;
+  --surface-3: #22262e;
+  --line: #262a33;
+  --line-strong: #333945;
+  --ink: #f0f2f5;
+  --ink-2: #9aa2b1;
+  --ink-3: #6c7484;
+
+  --ok: #3ecf8e;
+  --ok-bg: rgba(62, 207, 142, 0.12);
+  --ok-line: rgba(62, 207, 142, 0.3);
+  --warn: #f5b544;
+  --warn-bg: rgba(245, 181, 68, 0.12);
+  --warn-line: rgba(245, 181, 68, 0.3);
+  --bad: #ff6b63;
+  --bad-bg: rgba(255, 107, 99, 0.12);
+  --bad-line: rgba(255, 107, 99, 0.32);
+
+  --brand: #f0f2f5;
+  --brand-ink: #101319;
+
+  --ring: rgba(240, 242, 245, 0.16);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 28px -12px rgba(0, 0, 0, 0.7);
+  --shadow-pop: 0 16px 40px -16px rgba(0, 0, 0, 0.8);
+
+  color-scheme: dark;
+}
+
+/* Type inside the app: one workhorse, sentence case, real steps in scale. */
+[data-surface="app"] h1,
+[data-surface="app"] h2,
+[data-surface="app"] h3 {
+  font-family: var(--f-sans);
+  letter-spacing: -0.018em;
+  text-wrap: balance;
+}
+[data-surface="app"] ::selection {
+  background: var(--ink);
+  color: var(--surface);
+}
+[data-surface="app"] :focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+[data-surface="app"] input::placeholder,
+[data-surface="app"] textarea::placeholder {
+  color: var(--ink-3);
+}
+[data-surface="app"] :lang(zh) {
+  line-height: 1.75;
+}
+
+@keyframes app-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.app-rise {
+  animation: app-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── App motion ────────────────────────────────────────────────────────────
+   Built-in CSS easings are too weak to read as intentional. These are the
+   stronger variants, and every transition in the app names the properties it
+   animates rather than reaching for `all`.
+   ------------------------------------------------------------------------- */
+
+[data-surface="app"] {
+  --e-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --e-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* Entering, so ease-out: the movement starts fast, where the eye is watching. */
+@keyframes app-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.app-rise {
+  animation: app-rise 260ms var(--e-out) both;
+}
+
+/*
+  Cards cascade rather than landing together. Short delays only: past about
+  80ms apiece the page starts to feel like it is loading slowly.
+*/
+.app-stagger > * {
+  animation: app-rise 300ms var(--e-out) both;
+}
+.app-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.app-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.app-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.app-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.app-stagger > *:nth-child(n + 5) { animation-delay: 160ms; }
+
+/* Touch devices fire hover on tap and keep it, so gate every hover effect. */
+@media (hover: hover) and (pointer: fine) {
+  [data-surface="app"] .hoverable:hover {
+    background: var(--surface-2);
+  }
+}
+
+/*
+  Reduced motion means fewer and gentler, not none. Opacity still carries the
+  meaning of something arriving; the movement is what goes.
+*/
+@media (prefers-reduced-motion: reduce) {
+  [data-surface="app"] .app-rise,
+  [data-surface="app"] .app-stagger > * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
