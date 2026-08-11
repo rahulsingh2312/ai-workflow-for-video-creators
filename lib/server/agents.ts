@@ -2,13 +2,24 @@ import { all, id, now, one, run } from "@/lib/server/db";
 import { audit } from "@/lib/server/audit";
 import type { Session } from "@/lib/server/auth";
 import { HttpError } from "@/lib/server/auth";
-import { complete, retrieve, runAgent, type AgentResult } from "@/lib/server/gateway";
+import {
+  complete,
+  discoveryProvider,
+  fetchVirals,
+  retrieve,
+  runAgent,
+  velocityOf,
+  type AgentResult,
+} from "@/lib/server/gateway";
 import { invalidatePackages } from "@/lib/server/interlocking";
 
 function cfg(workspaceId: string, key: string): string | null {
   return (
-    one<{ value: string }>("SELECT value FROM config WHERE workspace_id = ? AND key = ?", workspaceId, key)
-      ?.value ?? null
+    one<{ value: string }>(
+      "SELECT value FROM config WHERE workspace_id = ? AND key = ?",
+      workspaceId,
+      key,
+    )?.value ?? null
   );
 }
 function cfgJson<T>(workspaceId: string, key: string, fallback: T): T {
@@ -30,15 +41,30 @@ const STRUCTURE = [
   { key: "close", en: "Interactive ending", zh: "互动收尾" },
 ];
 
-export async function generateScript(session: Session, taskId: string, note?: string) {
-  const task = one<{ id: string; title_zh: string; title_en: string; candidate_id: string | null }>(
+export async function generateScript(
+  session: Session,
+  taskId: string,
+  note?: string,
+) {
+  const task = one<{
+    id: string;
+    title_zh: string;
+    title_en: string;
+    candidate_id: string | null;
+  }>(
     "SELECT id,title_zh,title_en,candidate_id FROM content_task WHERE id = ? AND workspace_id = ?",
     taskId,
     session.workspaceId,
   );
   if (!task) throw new HttpError(404, "no_task", "No such task.");
 
-  const sources = all<{ id: string; label_zh: string; label_en: string; trust: string; published_at: string }>(
+  const sources = all<{
+    id: string;
+    label_zh: string;
+    label_en: string;
+    trust: string;
+    published_at: string;
+  }>(
     `SELECT s.id,s.label_zh,s.label_en,s.trust,s.published_at
        FROM task_source ts JOIN source s ON s.id = ts.source_id
       WHERE ts.task_id = ?`,
@@ -46,25 +72,82 @@ export async function generateScript(session: Session, taskId: string, note?: st
   );
   const minChars = Number(cfg(session.workspaceId, "script.min_chars") ?? 1200);
   const maxChars = Number(cfg(session.workspaceId, "script.max_chars") ?? 1400);
-  const forbidden = cfgJson<string[]>(session.workspaceId, "script.forbidden_phrases", []);
+  const forbidden = cfgJson<string[]>(
+    session.workspaceId,
+    "script.forbidden_phrases",
+    [],
+  );
   const parent = one<{ id: string; label: string }>(
     "SELECT id,label FROM script_version WHERE task_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1",
     taskId,
   );
 
-  return runAgent<{ version_id: string; label: string; chars: number; style_checks: string[] }>(
-    { workspaceId: session.workspaceId, taskId, agent: "script", promptVersion: "script.zh.v7" },
+  /*
+    The videos that raised this topic, carried through from the candidate.
+
+    They are here to shape the telling, not the content: which question the
+    audience actually clicked on, how quickly it got to the point. The facts
+    still come only from task_source, which is why these are passed as a
+    separate block the prompt is explicit about, rather than mixed in with the
+    sources where the model would cite them.
+  */
+  const models = all<{
+    platform: string;
+    title: string;
+    channel: string;
+    views: number;
+    velocity: number;
+  }>(
+    `SELECT v.platform,v.title,v.channel,v.views,v.velocity
+       FROM candidate_video cv
+       JOIN viral_video v ON v.id = cv.video_id
+       JOIN content_task t ON t.candidate_id = cv.candidate_id
+      WHERE t.id = ? ORDER BY v.velocity DESC LIMIT 5`,
+    taskId,
+  );
+
+  return runAgent<{
+    version_id: string;
+    label: string;
+    chars: number;
+    style_checks: string[];
+    modelled_on: string[];
+  }>(
+    {
+      workspaceId: session.workspaceId,
+      taskId,
+      agent: "script",
+      promptVersion: "script.zh.v7",
+    },
     async () => {
-      const sourceList = sources.map((s) => `- [${s.id}] ${s.label_zh} (${s.trust}, ${s.published_at})`).join("\n");
+      const sourceList = sources
+        .map((s) => `- [${s.id}] ${s.label_zh} (${s.trust}, ${s.published_at})`)
+        .join("\n");
+
+      const modelList = models
+        .map(
+          (m) =>
+            `- 《${m.title}》（${m.channel}，${m.platform === "youtube" ? "YouTube" : "视频号"}，` +
+            `${compactZh(m.views)}次播放，日均 ${compactZh(m.velocity)}）`,
+        )
+        .join("\n");
 
       const draft = await complete({
         system:
           "你是一位中文口播视频撰稿人。用口语化、可信、克制的语气写作。" +
           "结构固定：问题开场、一个清楚的类比、三段主体、互动收尾。" +
           "每一条事实性主张后面用 [来源ID] 标注它依据的来源。" +
-          `禁止使用这些表述：${forbidden.join("、")}。不要做预测，不要用绝对化措辞。`,
+          `禁止使用这些表述：${forbidden.join("、")}。不要做预测，不要用绝对化措辞。` +
+          (models.length
+            ? "参考视频只用来判断观众关心的是什么、开场该多快、讲到多细。" +
+              "它们不是来源：不要从里面取任何事实、数字或说法，也不要模仿它们的原句。" +
+              "所有事实只能来自“可用来源”。"
+            : ""),
         prompt:
           `选题：${task.title_zh}\n\n可用来源：\n${sourceList}\n\n` +
+          (models.length
+            ? `观众正在看的同题视频（只作形式参考，不可引用）：\n${modelList}\n\n`
+            : "") +
           `目标字数：${minChars} 到 ${maxChars} 个汉字。\n` +
           (note ? `本次要求：${note}\n` : ""),
         maxTokens: 3000,
@@ -74,7 +157,9 @@ export async function generateScript(session: Session, taskId: string, note?: st
       const body = draft.text.trim();
       const chars = (body.match(/[一-鿿]/g) ?? []).length || body.length;
 
-      const label = parent ? `v${Number(parent.label.replace("v", "")) + 1}` : "v1";
+      const label = parent
+        ? `v${Number(parent.label.replace("v", "")) + 1}`
+        : "v1";
       const versionId = id("sv");
       const t = now();
       run(
@@ -82,32 +167,60 @@ export async function generateScript(session: Session, taskId: string, note?: st
          (id,workspace_id,task_id,parent_id,label,body,chars,author_id,author_label,note_en,note_zh,
           model_version,prompt_version,status,created_at,updated_at,created_by)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        versionId, session.workspaceId, taskId, parent?.id ?? null, label, body, chars,
-        null, "Script Agent",
+        versionId,
+        session.workspaceId,
+        taskId,
+        parent?.id ?? null,
+        label,
+        body,
+        chars,
+        null,
+        "Script Agent",
         note ? `Rewrite: ${note}` : "First draft from the approved brief",
         note ? `按要求重写：${note}` : "依据已批准需求的初稿",
-        draft.model, "script.zh.v7", "draft", t, t, `agent:script`,
+        draft.model,
+        "script.zh.v7",
+        "draft",
+        t,
+        t,
+        `agent:script`,
       );
 
       // The claim-to-source map is built while writing, not afterwards.
       buildClaimMap(versionId, body);
 
       const styleChecks: string[] = [];
-      if (chars < minChars) styleChecks.push(`Under target: ${chars} of ${minChars} characters`);
-      if (chars > maxChars) styleChecks.push(`Over target: ${chars} of ${maxChars} characters`);
+      if (chars < minChars)
+        styleChecks.push(`Under target: ${chars} of ${minChars} characters`);
+      if (chars > maxChars)
+        styleChecks.push(`Over target: ${chars} of ${maxChars} characters`);
       for (const phrase of forbidden) {
-        if (body.includes(phrase)) styleChecks.push(`Forbidden phrase used: ${phrase}`);
+        if (body.includes(phrase))
+          styleChecks.push(`Forbidden phrase used: ${phrase}`);
       }
       for (const part of STRUCTURE) {
-        if (!body.includes(`【${part.zh}】`)) styleChecks.push(`Structure section missing: ${part.en}`);
+        if (!body.includes(`【${part.zh}】`))
+          styleChecks.push(`Structure section missing: ${part.en}`);
       }
 
-      audit(session, "generation", "script_version", versionId, null,
-        { label, chars, model: draft.model, prompt: "script.zh.v7", parent: parent?.label ?? null });
+      audit(session, "generation", "script_version", versionId, null, {
+        label,
+        chars,
+        model: draft.model,
+        prompt: "script.zh.v7",
+        parent: parent?.label ?? null,
+      });
 
       return {
-        status: styleChecks.length ? ("needs_review" as const) : ("completed" as const),
-        payload: { version_id: versionId, label, chars, style_checks: styleChecks },
+        status: styleChecks.length
+          ? ("needs_review" as const)
+          : ("completed" as const),
+        payload: {
+          version_id: versionId,
+          label,
+          chars,
+          style_checks: styleChecks,
+        },
         source_refs: sources.map((s) => s.id),
         confidence: styleChecks.length ? 0.68 : 0.86,
         risk_flags: styleChecks.map((s) => ({ level: "LOW", note: s })),
@@ -131,7 +244,8 @@ function localDraft(
   sources: { id: string; label_zh: string; published_at: string }[],
   minChars: number,
 ): string {
-  const s = (i: number) => sources[i % Math.max(sources.length, 1)]?.id ?? "unsourced";
+  const s = (i: number) =>
+    sources[i % Math.max(sources.length, 1)]?.id ?? "unsourced";
 
   const sections = [
     `【问题开场】\n先问一个问题：${title}，这件事现在到底定了没有？这几天我看到不少解读，` +
@@ -212,7 +326,12 @@ export function buildClaimMap(versionId: string, body: string) {
   for (const cl of claims) {
     run(
       `INSERT INTO claim_map (id,version_id,claim,source_id,offset_start,offset_end) VALUES (?,?,?,?,?,?)`,
-      id("cm"), versionId, cl.claim, cl.sourceId, cl.start, cl.end,
+      id("cm"),
+      versionId,
+      cl.claim,
+      cl.sourceId,
+      cl.start,
+      cl.end,
     );
   }
   return claims.length;
@@ -225,7 +344,12 @@ export function buildClaimMap(versionId: string, body: string) {
  * that can be wrong in a way that matters. Everything else is prose.
  */
 function extractClaims(body: string) {
-  const out: { claim: string; sourceId: string | null; start: number; end: number }[] = [];
+  const out: {
+    claim: string;
+    sourceId: string | null;
+    start: number;
+    end: number;
+  }[] = [];
   const re = /([^\n。！？]{6,}?[。！？])(\s*\[([a-z_0-9]+)\])?/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(body))) {
@@ -249,19 +373,50 @@ function extractClaims(body: string) {
 
 /* ── 7.3 Fact Check Agent ────────────────────────────────────────────────── */
 
-const ABSOLUTE = ["所有", "全部", "一定", "必然", "百分百", "肯定会", "每一家", "无一例外"];
-const FORECAST = ["将会", "预计将", "势必", "接下来一定", "明年一季度", "很快就会"];
+const ABSOLUTE = [
+  "所有",
+  "全部",
+  "一定",
+  "必然",
+  "百分百",
+  "肯定会",
+  "每一家",
+  "无一例外",
+];
+const FORECAST = [
+  "将会",
+  "预计将",
+  "势必",
+  "接下来一定",
+  "明年一季度",
+  "很快就会",
+];
 
 export async function factCheck(session: Session, versionId: string) {
-  const version = one<{ id: string; task_id: string; body: string; workspace_id: string }>(
+  const version = one<{
+    id: string;
+    task_id: string;
+    body: string;
+    workspace_id: string;
+  }>(
     "SELECT id,task_id,body,workspace_id FROM script_version WHERE id = ? AND workspace_id = ?",
     versionId,
     session.workspaceId,
   );
-  if (!version) throw new HttpError(404, "no_version", "No such script version.");
+  if (!version)
+    throw new HttpError(404, "no_version", "No such script version.");
 
-  const sensitive = cfgJson<string[]>(session.workspaceId, "risk.sensitive_categories", []);
-  const sources = all<{ id: string; label_zh: string; published_at: string; trust: string }>(
+  const sensitive = cfgJson<string[]>(
+    session.workspaceId,
+    "risk.sensitive_categories",
+    [],
+  );
+  const sources = all<{
+    id: string;
+    label_zh: string;
+    published_at: string;
+    trust: string;
+  }>(
     `SELECT s.id,s.label_zh,s.published_at,s.trust FROM task_source ts
        JOIN source s ON s.id = ts.source_id WHERE ts.task_id = ?`,
     version.task_id,
@@ -272,16 +427,27 @@ export async function factCheck(session: Session, versionId: string) {
   );
 
   return runAgent<{ version_id: string; flags: number; blocking: number }>(
-    { workspaceId: session.workspaceId, taskId: version.task_id, agent: "factcheck", promptVersion: "factcheck.zh.v4" },
+    {
+      workspaceId: session.workspaceId,
+      taskId: version.task_id,
+      agent: "factcheck",
+      promptVersion: "factcheck.zh.v4",
+    },
     async () => {
-      run("DELETE FROM risk_flag WHERE version_id = ? AND resolution IS NULL", versionId);
+      run(
+        "DELETE FROM risk_flag WHERE version_id = ? AND resolution IS NULL",
+        versionId,
+      );
 
       const found: {
         level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-        cat_en: string; cat_zh: string;
+        cat_en: string;
+        cat_zh: string;
         claim: string;
-        reason_en: string; reason_zh: string;
-        ev_en: string; ev_zh: string;
+        reason_en: string;
+        reason_zh: string;
+        ev_en: string;
+        ev_zh: string;
         sourceId: string | null;
       }[] = [];
 
@@ -290,7 +456,8 @@ export async function factCheck(session: Session, versionId: string) {
         if (hitAbsolute && !cl.source_id) {
           found.push({
             level: "CRITICAL",
-            cat_en: "Absolute wording, no evidence", cat_zh: "绝对化表述，且无证据",
+            cat_en: "Absolute wording, no evidence",
+            cat_zh: "绝对化表述，且无证据",
             claim: cl.claim,
             reason_en: `The claim uses "${hitAbsolute}" and no approved source is mapped to it.`,
             reason_zh: `这句话用了“${hitAbsolute}”，而且没有任何已批准来源对应到它。`,
@@ -303,7 +470,8 @@ export async function factCheck(session: Session, versionId: string) {
         if (hitAbsolute) {
           found.push({
             level: "HIGH",
-            cat_en: "Absolute wording", cat_zh: "绝对化表述",
+            cat_en: "Absolute wording",
+            cat_zh: "绝对化表述",
             claim: cl.claim,
             reason_en: `"${hitAbsolute}" leaves no room for exceptions. Check the source supports the full scope.`,
             reason_zh: `“${hitAbsolute}”不留例外。要确认来源支持这么大的范围。`,
@@ -316,11 +484,15 @@ export async function factCheck(session: Session, versionId: string) {
         if (hitForecast) {
           found.push({
             level: "HIGH",
-            cat_en: "Conflicts with the source", cat_zh: "与来源冲突",
+            cat_en: "Conflicts with the source",
+            cat_zh: "与来源冲突",
             claim: cl.claim,
-            reason_en: "The claim states a timetable as settled. The source is a consultation draft with no effective date.",
-            reason_zh: "这句话把时间表说成了定局，而来源是征求意见稿，里面没有实施日期。",
-            ev_en: "Consultation draft cover note: comments close 2026-08-21, effective date announced separately.",
+            reason_en:
+              "The claim states a timetable as settled. The source is a consultation draft with no effective date.",
+            reason_zh:
+              "这句话把时间表说成了定局，而来源是征求意见稿，里面没有实施日期。",
+            ev_en:
+              "Consultation draft cover note: comments close 2026-08-21, effective date announced separately.",
             ev_zh: "征求意见稿说明：意见截止 2026-08-21，实施日期另行公布。",
             sourceId: cl.source_id,
           });
@@ -328,7 +500,8 @@ export async function factCheck(session: Session, versionId: string) {
         if (!cl.source_id) {
           found.push({
             level: "HIGH",
-            cat_en: "No evidence behind the claim", cat_zh: "主张没有证据支撑",
+            cat_en: "No evidence behind the claim",
+            cat_zh: "主张没有证据支撑",
             claim: cl.claim,
             reason_en: "No approved source is mapped to this sentence.",
             reason_zh: "这句话没有对应到任何已批准来源。",
@@ -338,16 +511,22 @@ export async function factCheck(session: Session, versionId: string) {
           });
         }
         const stale = sources.find(
-          (s) => cl.source_id === s.id && s.published_at && Number(s.published_at.slice(0, 4)) < new Date().getFullYear() - 1,
+          (s) =>
+            cl.source_id === s.id &&
+            s.published_at &&
+            Number(s.published_at.slice(0, 4)) < new Date().getFullYear() - 1,
         );
         if (stale) {
           found.push({
             level: "LOW",
-            cat_en: "Ageing information", cat_zh: "信息可能过时",
+            cat_en: "Ageing information",
+            cat_zh: "信息可能过时",
             claim: cl.claim,
             reason_en: `The mapped source is from ${stale.published_at.slice(0, 4)}. Probably still fine, worth a glance.`,
             reason_zh: `对应来源是 ${stale.published_at.slice(0, 4)} 年的。大概率还成立，但值得再看一眼。`,
-            ev_en: stale.label_zh, ev_zh: stale.label_zh, sourceId: stale.id,
+            ev_en: stale.label_zh,
+            ev_zh: stale.label_zh,
+            sourceId: stale.id,
           });
         }
       }
@@ -360,12 +539,17 @@ export async function factCheck(session: Session, versionId: string) {
         ["业绩", "performance claims", "业绩表述"],
       ];
       for (const [needle, catEn, catZh] of SENSITIVE_HINTS) {
-        if (version.body.includes(needle) && sensitive.some((s) => s.includes(catEn.split(" ")[0]))) {
+        if (
+          version.body.includes(needle) &&
+          sensitive.some((s) => s.includes(catEn.split(" ")[0]))
+        ) {
           found.push({
             level: "MEDIUM",
-            cat_en: `Sensitive category: ${catEn}`, cat_zh: `敏感类别：${catZh}`,
+            cat_en: `Sensitive category: ${catEn}`,
+            cat_zh: `敏感类别：${catZh}`,
             claim: needle,
-            reason_en: "On this workspace's sensitive list. A reviewer can approve it, but it should be a decision.",
+            reason_en:
+              "On this workspace's sensitive list. A reviewer can approve it, but it should be a decision.",
             reason_zh: "在本工作区的敏感清单上。审核可以放行，但这该是个决定。",
             ev_en: "Workspace risk policy, sensitive categories",
             ev_zh: "工作区风险政策，敏感类别",
@@ -394,14 +578,37 @@ export async function factCheck(session: Session, versionId: string) {
            (id,workspace_id,version_id,level,category_en,category_zh,claim_en,claim_zh,reason_en,reason_zh,
             evidence_en,evidence_zh,source_id,created_at,updated_at,created_by)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          id("rf"), session.workspaceId, versionId, f.level, f.cat_en, f.cat_zh,
-          f.claim, f.claim, f.reason_en, f.reason_zh, f.ev_en, f.ev_zh, f.sourceId, t, t, "agent:factcheck",
+          id("rf"),
+          session.workspaceId,
+          versionId,
+          f.level,
+          f.cat_en,
+          f.cat_zh,
+          f.claim,
+          f.claim,
+          f.reason_en,
+          f.reason_zh,
+          f.ev_en,
+          f.ev_zh,
+          f.sourceId,
+          t,
+          t,
+          "agent:factcheck",
         );
       }
 
-      run("UPDATE script_version SET status = 'in_review', updated_at = ? WHERE id = ? AND status = 'draft'", t, versionId);
-      const blocking = found.filter((f) => f.level === "HIGH" || f.level === "CRITICAL").length;
-      audit(session, "generation", "risk_flag", versionId, null, { flags: found.length, blocking });
+      run(
+        "UPDATE script_version SET status = 'in_review', updated_at = ? WHERE id = ? AND status = 'draft'",
+        t,
+        versionId,
+      );
+      const blocking = found.filter(
+        (f) => f.level === "HIGH" || f.level === "CRITICAL",
+      ).length;
+      audit(session, "generation", "risk_flag", versionId, null, {
+        flags: found.length,
+        blocking,
+      });
 
       return {
         status: blocking ? ("needs_review" as const) : ("completed" as const),
@@ -429,72 +636,125 @@ export async function generatePackages(session: Session, taskId: string) {
     "SELECT id,label,body FROM script_version WHERE task_id = ? AND status = 'locked' ORDER BY locked_at DESC LIMIT 1",
     taskId,
   );
-  if (!locked) throw new HttpError(409, "no_locked_script", "A package needs a locked script version.");
+  if (!locked)
+    throw new HttpError(
+      409,
+      "no_locked_script",
+      "A package needs a locked script version.",
+    );
 
   const asset = one<{ id: string; script_version_id: string }>(
     `SELECT id,script_version_id FROM media_asset WHERE task_id = ? AND kind = 'final_video'
      ORDER BY created_at DESC LIMIT 1`,
     taskId,
   );
-  if (!asset) throw new HttpError(409, "no_video", "A package needs a final video.");
+  if (!asset)
+    throw new HttpError(409, "no_video", "A package needs a final video.");
   if (asset.script_version_id !== locked.id) {
-    throw new HttpError(409, "pair_mismatch", "The final video is bound to a different script version.");
+    throw new HttpError(
+      409,
+      "pair_mismatch",
+      "The final video is bound to a different script version.",
+    );
   }
 
   const platforms = JSON.parse(task.platforms) as string[];
 
   return runAgent<{ platforms: string[]; skipped: string[] }>(
-    { workspaceId: session.workspaceId, taskId, agent: "publish", promptVersion: "publish.zh.v3" },
+    {
+      workspaceId: session.workspaceId,
+      taskId,
+      agent: "publish",
+      promptVersion: "publish.zh.v3",
+    },
     async () => {
       const made: string[] = [];
       const skipped: string[] = [];
       const t = now();
 
       for (const platform of platforms) {
-        const rules = cfgJson<{ titleMax: number; coverMax: number; tagsMax: number } | null>(
-          session.workspaceId, `platform.${platform}.rules`, null,
-        );
+        const rules = cfgJson<{
+          titleMax: number;
+          coverMax: number;
+          tagsMax: number;
+        } | null>(session.workspaceId, `platform.${platform}.rules`, null);
         if (!rules) {
           skipped.push(platform);
           continue;
         }
 
         const payload = buildPackage(task.title_zh, locked.body, rules);
-        run("UPDATE publish_package SET status='invalid', updated_at=? WHERE task_id=? AND platform=? AND status='ready'",
-          t, taskId, platform);
+        run(
+          "UPDATE publish_package SET status='invalid', updated_at=? WHERE task_id=? AND platform=? AND status='ready'",
+          t,
+          taskId,
+          platform,
+        );
         const pkgId = id("pp");
         run(
           `INSERT INTO publish_package
            (id,workspace_id,task_id,script_version_id,media_asset_id,platform,payload,status,created_at,updated_at,created_by)
            VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-          pkgId, session.workspaceId, taskId, locked.id, asset.id, platform,
-          JSON.stringify(payload), "ready", t, t, "agent:publish",
+          pkgId,
+          session.workspaceId,
+          taskId,
+          locked.id,
+          asset.id,
+          platform,
+          JSON.stringify(payload),
+          "ready",
+          t,
+          t,
+          "agent:publish",
         );
-        audit(session, "generation", "publish_package", pkgId, null,
-          { platform, script_version: locked.label, media_asset: asset.id });
+        audit(session, "generation", "publish_package", pkgId, null, {
+          platform,
+          script_version: locked.label,
+          media_asset: asset.id,
+        });
         made.push(platform);
       }
 
       return {
-        status: skipped.length ? ("needs_review" as const) : ("completed" as const),
+        status: skipped.length
+          ? ("needs_review" as const)
+          : ("completed" as const),
         payload: { platforms: made, skipped },
         source_refs: [locked.id, asset.id],
         confidence: 0.88,
-        risk_flags: skipped.map((p) => ({ level: "MEDIUM", note: `No platform rules configured for ${p}` })),
+        risk_flags: skipped.map((p) => ({
+          level: "MEDIUM",
+          note: `No platform rules configured for ${p}`,
+        })),
         human_action_required: true,
       };
     },
   );
 }
 
-function buildPackage(title: string, body: string, rules: { titleMax: number; coverMax: number; tagsMax: number }) {
-  const clip = (s: string, n: number) => (s.length <= n ? s : s.slice(0, n - 1) + "…");
+function buildPackage(
+  title: string,
+  body: string,
+  rules: { titleMax: number; coverMax: number; tagsMax: number },
+) {
+  const clip = (s: string, n: number) =>
+    s.length <= n ? s : s.slice(0, n - 1) + "…";
   const hook = body.match(/【问题开场】\s*([^\n]+)/)?.[1] ?? title;
-  const cut = (body.match(/【三段主体】\s*([^\n]+)/)?.[1] ?? "").replace(/\[[a-z_0-9]+\]/g, "");
+  const cut = (body.match(/【三段主体】\s*([^\n]+)/)?.[1] ?? "").replace(
+    /\[[a-z_0-9]+\]/g,
+    "",
+  );
   return {
-    titles: [clip(title, rules.titleMax), clip(hook, rules.titleMax), clip(cut || title, rules.titleMax)],
+    titles: [
+      clip(title, rules.titleMax),
+      clip(hook, rules.titleMax),
+      clip(cut || title, rules.titleMax),
+    ],
     caption: clip(hook.replace(/\[[a-z_0-9]+\]/g, ""), 120),
-    tags: ["信息披露", "监管解读", "合规", "财经", "干货"].slice(0, rules.tagsMax),
+    tags: ["信息披露", "监管解读", "合规", "财经", "干货"].slice(
+      0,
+      rules.tagsMax,
+    ),
     cover: clip("先读附件", rules.coverMax),
     cover_brief: "深色底，单行大字，右下角放期数编号。不要用图表截图当封面。",
     checklist: [
@@ -519,7 +779,10 @@ const TAKEOVER_PATTERNS: [RegExp, string][] = [
   [/危机|舆情|负面/i, "crisis"],
 ];
 const REFUSE_PATTERNS: [RegExp, string][] = [
-  [/该买|买哪只|推荐.*股|荐股|stock.*buy|which stock/i, "individual investment advice"],
+  [
+    /该买|买哪只|推荐.*股|荐股|stock.*buy|which stock/i,
+    "individual investment advice",
+  ],
   [/内幕|未公开信息/i, "non-public information"],
 ];
 const INTENTS: [RegExp, string, number][] = [
@@ -531,8 +794,15 @@ const INTENTS: [RegExp, string, number][] = [
   [/咨询|请教|consult/i, "consultation", 45],
 ];
 
-export async function personaReply(session: Session, message: string, participant: string, externalId?: string) {
-  const threshold = Number(cfg(session.workspaceId, "persona.auto_threshold") ?? 0.85);
+export async function personaReply(
+  session: Session,
+  message: string,
+  participant: string,
+  externalId?: string,
+) {
+  const threshold = Number(
+    cfg(session.workspaceId, "persona.auto_threshold") ?? 0.85,
+  );
 
   return runAgent<{
     conversation_id: string;
@@ -558,7 +828,8 @@ export async function personaReply(session: Session, message: string, participan
 
       if (refuse) {
         mode = "REFUSE";
-        answer = "这个问题我不能回答。个股买卖属于投资建议，不在可回答范围内。需要的话我可以把公开资料的读法讲给你。";
+        answer =
+          "这个问题我不能回答。个股买卖属于投资建议，不在可回答范围内。需要的话我可以把公开资料的读法讲给你。";
         confidence = 0.96;
         reason = `Disallowed: ${refuse[1]}`;
       } else if (takeover) {
@@ -570,7 +841,8 @@ export async function personaReply(session: Session, message: string, participan
         mode = "HANDOFF";
         answer = null;
         confidence = 0.31;
-        reason = "No approved passage retrieved, so there is nothing to ground an answer in.";
+        reason =
+          "No approved passage retrieved, so there is nothing to ground an answer in.";
       } else {
         const grounded = await complete({
           system:
@@ -597,12 +869,26 @@ export async function personaReply(session: Session, message: string, participan
         `INSERT INTO conversation
          (id,workspace_id,participant,message,ai_answer,sources,confidence,mode,trigger_reason,takeover_state,external_id,created_at,updated_at,created_by)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        convId, session.workspaceId, participant, message, answer,
-        JSON.stringify(passages.map((p) => p.documentId)), confidence, mode, reason,
+        convId,
+        session.workspaceId,
+        participant,
+        message,
+        answer,
+        JSON.stringify(passages.map((p) => p.documentId)),
+        confidence,
+        mode,
+        reason,
         mode === "HANDOFF" ? "requested" : "none",
-        externalId ?? `local:${convId}`, t, t, "agent:persona",
+        externalId ?? `local:${convId}`,
+        t,
+        t,
+        "agent:persona",
       );
-      audit(session, "ai_reply", "conversation", convId, null, { mode, confidence, reason });
+      audit(session, "ai_reply", "conversation", convId, null, {
+        mode,
+        confidence,
+        reason,
+      });
 
       // 7.7: lead detection runs on the same message.
       let leadId: string | null = null;
@@ -611,25 +897,46 @@ export async function personaReply(session: Session, message: string, participan
         const [, name, score] = intent;
         const dupe = one<{ id: string }>(
           "SELECT id FROM lead WHERE workspace_id = ? AND contact = ? AND intent = ? AND status NOT IN ('closed','rejected')",
-          session.workspaceId, participant, name,
+          session.workspaceId,
+          participant,
+          name,
         );
         if (!dupe) {
           leadId = id("l");
           run(
             `INSERT INTO lead (id,workspace_id,conversation_id,contact,intent,score,status,notified_at,created_at,updated_at,created_by)
              VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-            leadId, session.workspaceId, convId, participant, name, score, "new", t, t, t, "agent:leads",
+            leadId,
+            session.workspaceId,
+            convId,
+            participant,
+            name,
+            score,
+            "new",
+            t,
+            t,
+            t,
+            "agent:leads",
           );
-          audit(session, "lead_created", "lead", leadId, null, { intent: name, score, from: convId });
+          audit(session, "lead_created", "lead", leadId, null, {
+            intent: name,
+            score,
+            from: convId,
+          });
         }
       }
 
       return {
-        status: mode === "AUTO" ? ("completed" as const) : ("needs_review" as const),
+        status:
+          mode === "AUTO" ? ("completed" as const) : ("needs_review" as const),
         payload: { conversation_id: convId, mode, answer, lead_id: leadId },
         source_refs: passages.map((p) => p.documentId),
         confidence,
-        risk_flags: takeover ? [{ level: "HIGH", note: takeover[1] }] : refuse ? [{ level: "CRITICAL", note: refuse[1] }] : [],
+        risk_flags: takeover
+          ? [{ level: "HIGH", note: takeover[1] }]
+          : refuse
+            ? [{ level: "CRITICAL", note: refuse[1] }]
+            : [],
         human_action_required: mode !== "AUTO",
       };
     },
@@ -642,11 +949,24 @@ export async function analyse(session: Session) {
   return runAgent<{
     totals: Record<string, number | null>;
     missing: string[];
-    by_platform: { platform: string; method: string; metrics: Record<string, number> }[];
+    by_platform: {
+      platform: string;
+      method: string;
+      metrics: Record<string, number>;
+    }[];
   }>(
-    { workspaceId: session.workspaceId, agent: "analytics", promptVersion: "analytics.v2" },
+    {
+      workspaceId: session.workspaceId,
+      agent: "analytics",
+      promptVersion: "analytics.v2",
+    },
     async () => {
-      const snaps = all<{ platform: string; collection_method: string; metrics: string; missing_fields: string }>(
+      const snaps = all<{
+        platform: string;
+        collection_method: string;
+        metrics: string;
+        missing_fields: string;
+      }>(
         "SELECT platform,collection_method,metrics,missing_fields FROM metric_snapshot WHERE workspace_id = ?",
         session.workspaceId,
       );
@@ -655,17 +975,24 @@ export async function analyse(session: Session) {
       const missing = new Set<string>();
       const byPlatform = snaps.map((s) => {
         const m = JSON.parse(s.metrics) as Record<string, number>;
-        for (const f of JSON.parse(s.missing_fields) as string[]) missing.add(f);
+        for (const f of JSON.parse(s.missing_fields) as string[])
+          missing.add(f);
         for (const [k, v] of Object.entries(m)) {
           if (k.endsWith("_rate")) continue;
           totals[k] = (totals[k] ?? 0) + v;
         }
-        return { platform: s.platform, method: s.collection_method, metrics: m };
+        return {
+          platform: s.platform,
+          method: s.collection_method,
+          metrics: m,
+        };
       });
 
       // Derived rates come only from fields that are actually present.
-      if (totals.views && totals.likes != null) totals.like_rate = +(totals.likes / totals.views).toFixed(4);
-      if (totals.views && totals.shares != null) totals.share_rate = +(totals.shares / totals.views).toFixed(4);
+      if (totals.views && totals.likes != null)
+        totals.like_rate = +(totals.likes / totals.views).toFixed(4);
+      if (totals.views && totals.shares != null)
+        totals.share_rate = +(totals.shares / totals.views).toFixed(4);
       for (const field of missing) totals[field] = null;
 
       return {
@@ -674,7 +1001,12 @@ export async function analyse(session: Session) {
         source_refs: snaps.map((s) => s.platform),
         confidence: 0.94,
         risk_flags: missing.size
-          ? [{ level: "LOW", note: `${missing.size} fields could not be collected and are reported as missing` }]
+          ? [
+              {
+                level: "LOW",
+                note: `${missing.size} fields could not be collected and are reported as missing`,
+              },
+            ]
           : [],
         human_action_required: false,
       };
@@ -684,60 +1016,428 @@ export async function analyse(session: Session) {
 
 /* ── 7.1 Topic Agent ─────────────────────────────────────────────────────── */
 
+/** "1.2M", "848k", "940". Used in the reason a reviewer reads. */
+function compact(n: number): string {
+  if (n >= 1_000_000)
+    return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1000)}k`;
+  return String(n);
+}
+
+/** The same number as a Chinese reader expects it: 万 rather than k. */
+function compactZh(n: number): string {
+  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)} 亿`;
+  if (n >= 10_000) return `${(n / 10_000).toFixed(n >= 1_000_000 ? 0 : 1)} 万`;
+  return String(n);
+}
+
+const daysBetween = (iso: string) =>
+  Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 86_400_000));
+
+const median = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s.length % 2
+    ? s[(s.length - 1) / 2]
+    : Math.round((s[s.length / 2 - 1] + s[s.length / 2]) / 2);
+};
+
+const PLATFORM_LABEL: Record<string, { en: string; zh: string }> = {
+  youtube: { en: "YouTube", zh: "YouTube" },
+  wechat_channels: { en: "WeChat Channels", zh: "视频号" },
+};
+
+/**
+ * Topics come from what an audience is already watching.
+ *
+ * The run pulls viral videos for each configured subject, groups them by that
+ * subject, and raises one candidate per group. Ranking is view velocity rather
+ * than raw views, plus engagement, spread across channels, and whatever
+ * approved recommendations have earned.
+ *
+ * A group only becomes a candidate if an approved source is tagged for its
+ * subject. A viral video shows that people are asking a question; it is never
+ * evidence of the answer, and a candidate's sources flow into task_source,
+ * which is what grounds the script and the claim map. Demand the workspace
+ * cannot source is reported in the payload rather than quietly dropped, and
+ * never quietly scripted.
+ */
 export async function runTopicAgent(session: Session) {
-  return runAgent<{ run_id: string; candidates: number }>(
-    { workspaceId: session.workspaceId, agent: "topic", promptVersion: "topic.zh.v5" },
+  return runAgent<{
+    run_id: string;
+    candidates: number;
+    refreshed: number;
+    videos: number;
+    unsourced: string[];
+    provider: string;
+  }>(
+    {
+      workspaceId: session.workspaceId,
+      agent: "topic",
+      promptVersion: "topic.viral.v1",
+    },
     async () => {
       const banned = cfgJson<string[]>(session.workspaceId, "topic.banned", []);
+      const platforms = cfgJson<string[]>(
+        session.workspaceId,
+        "topic.platforms",
+        ["youtube", "wechat_channels"],
+      );
+      const labels = cfgJson<Record<string, { en: string; zh: string }>>(
+        session.workspaceId,
+        "topic.keyword_labels",
+        {},
+      );
       const approvedWeights = all<{ effect: string }>(
         "SELECT effect FROM recommendation WHERE workspace_id = ? AND decision = 'approved'",
         session.workspaceId,
       ).map((r) => r.effect);
 
-      const sources = all<{ id: string; label_zh: string; trust: string; published_at: string }>(
-        "SELECT id,label_zh,trust,published_at FROM source WHERE workspace_id = ? AND status = 'approved'",
+      const sources = all<{
+        id: string;
+        label_en: string;
+        label_zh: string;
+        trust: string;
+        published_at: string;
+        keywords: string;
+      }>(
+        "SELECT id,label_en,label_zh,trust,published_at,keywords FROM source WHERE workspace_id = ? AND status = 'approved'",
         session.workspaceId,
       );
-      if (sources.length === 0) throw new Error("No approved sources configured for this workspace.");
+      if (sources.length === 0)
+        throw new Error("No approved sources configured for this workspace.");
+
+      const keywordsOf = (s: { keywords: string }): string[] => {
+        try {
+          const parsed = JSON.parse(s.keywords || "[]");
+          return Array.isArray(parsed) ? parsed.map(String) : [];
+        } catch {
+          return [];
+        }
+      };
+      const tagged = [...new Set(sources.flatMap(keywordsOf))];
+      const keywords = cfgJson<string[]>(
+        session.workspaceId,
+        "topic.keywords",
+        tagged,
+      );
+      if (keywords.length === 0) {
+        throw new Error(
+          "No topic keywords configured, and no approved source is tagged with one.",
+        );
+      }
+
+      const found = (await fetchVirals({ keywords })).filter((v) =>
+        platforms.includes(v.platform),
+      );
+      if (found.length === 0) {
+        throw new Error(
+          "Discovery returned nothing for the configured subjects and platforms.",
+        );
+      }
 
       const runId = `run_${Date.now().toString(36)}`;
       const t = now();
-      let made = 0;
 
-      for (const src of sources.slice(0, 3)) {
-        const titleZh = `围绕「${src.label_zh}」，这周值得讲的一条`;
-        if (banned.some((b) => titleZh.includes(b))) continue;
-
-        // Approved recommendations, and only those, change ranking.
-        let score = src.trust === "high" ? 78 : 64;
-        if (approvedWeights.includes("source_weight:+1:high_trust") && src.trust === "high") score += 6;
-
-        const cid = id("c");
-        run(
-          `INSERT INTO topic_candidate
-           (id,workspace_id,run_id,title_en,title_zh,angle_en,angle_zh,why_en,why_zh,score,reason_en,reason_zh,created_at,updated_at,created_by)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          cid, session.workspaceId, runId,
-          `This week's angle on ${src.label_zh}`, titleZh,
-          "Read the primary document, not the coverage of it", "读一手文件，而不是别人对它的报道",
-          `The source was published ${src.published_at} and nothing has covered the detail yet.`,
-          `来源发布于 ${src.published_at}，细节部分还没人讲。`,
-          score,
-          `Trust level ${src.trust}${approvedWeights.length ? ", adjusted by approved recommendations" : ""}.`,
-          `来源可信级别为 ${src.trust}${approvedWeights.length ? "，并按已通过的建议做过调整" : ""}。`,
-          t, t, "agent:topic",
+      /* Upsert first. A video that trends for a week is the same video, and it
+         must not accumulate a row per run. */
+      const rowIdOf = new Map<string, string>();
+      for (const v of found) {
+        const key = `${v.platform}:${v.videoId}`;
+        const velocity = velocityOf(v.views, v.publishedAt);
+        const prior = one<{ id: string }>(
+          "SELECT id FROM viral_video WHERE workspace_id = ? AND platform = ? AND video_id = ?",
+          session.workspaceId,
+          v.platform,
+          v.videoId,
         );
-        run(`INSERT INTO candidate_source (candidate_id,source_id) VALUES (?,?)`, cid, src.id);
-        made++;
+        if (prior) {
+          run(
+            `UPDATE viral_video SET title=?,channel=?,url=?,thumbnail=?,published_at=?,views=?,likes=?,
+                    comments=?,velocity=?,keyword=?,fetched_at=?,updated_at=?,revision=revision+1 WHERE id=?`,
+            v.title,
+            v.channel,
+            v.url,
+            v.thumbnail,
+            v.publishedAt,
+            v.views,
+            v.likes,
+            v.comments,
+            velocity,
+            v.keyword,
+            t,
+            t,
+            prior.id,
+          );
+          rowIdOf.set(key, prior.id);
+        } else {
+          const vid = id("vv");
+          run(
+            `INSERT INTO viral_video
+             (id,workspace_id,platform,video_id,title,channel,url,thumbnail,published_at,views,likes,comments,
+              velocity,keyword,fetched_at,created_at,updated_at,created_by)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            vid,
+            session.workspaceId,
+            v.platform,
+            v.videoId,
+            v.title,
+            v.channel,
+            v.url,
+            v.thumbnail,
+            v.publishedAt,
+            v.views,
+            v.likes,
+            v.comments,
+            velocity,
+            v.keyword,
+            t,
+            t,
+            t,
+            "agent:topic",
+          );
+          rowIdOf.set(key, vid);
+        }
       }
 
-      audit(session, "generation", "topic_candidate", runId, null, { candidates: made });
+      const runMedian =
+        median(found.map((v) => velocityOf(v.views, v.publishedAt))) || 1;
+      const unsourced: string[] = [];
+      let made = 0;
+      let refreshed = 0;
+
+      for (const keyword of keywords) {
+        const clip = found
+          .filter((v) => v.keyword === keyword)
+          .sort(
+            (a, b) =>
+              velocityOf(b.views, b.publishedAt) -
+              velocityOf(a.views, a.publishedAt),
+          );
+        if (clip.length === 0) continue;
+
+        const backing = sources.filter((s) => keywordsOf(s).includes(keyword));
+        if (backing.length === 0) {
+          // Real demand this workspace has no evidence for. Reported, not raised:
+          // a candidate with no source would hold the whole route at danger.
+          unsourced.push(keyword);
+          continue;
+        }
+
+        const label = labels[keyword] ?? { en: keyword, zh: keyword };
+        const top = clip[0];
+        const titleEn = `What people are actually asking about ${label.en}`;
+        const titleZh = `关于${label.zh}，大家真正在问的是什么`;
+        if (
+          banned.some(
+            (b) => titleZh.includes(b) || clip.some((v) => v.title.includes(b)),
+          )
+        )
+          continue;
+
+        const velocities = clip.map((v) => velocityOf(v.views, v.publishedAt));
+        const medVelocity = median(velocities);
+        const totalViews = clip.reduce((n, v) => n + v.views, 0);
+        const engagement =
+          clip.reduce((n, v) => n + v.likes + v.comments, 0) /
+          Math.max(totalViews, 1);
+        const channels = new Set(clip.map((v) => v.channel)).size;
+        const onPlatforms = [...new Set(clip.map((v) => v.platform))];
+        const bestTrust = backing.some((s) => s.trust === "high")
+          ? "high"
+          : backing.some((s) => s.trust === "medium")
+            ? "medium"
+            : "low";
+
+        /*
+          Two velocity terms, because they answer different questions and a
+          single one collapses the ranking.
+
+          The absolute term asks "is this actually big" on a log scale, where
+          1k/day scores nothing and 100k/day saturates. The relative term asks
+          "is this the standout of the run", and it goes negative, which is what
+          pulls the merely-fine topics down away from the good ones. With only
+          the absolute term every subject in a busy week lands in the eighties
+          and the reviewer gets no ordering worth reading.
+        */
+        const absolute = Math.min(
+          40,
+          Math.max(
+            0,
+            Math.round((Math.log10(Math.max(medVelocity, 1)) - 3) * 20),
+          ),
+        );
+        const relative = Math.min(
+          10,
+          Math.max(
+            -10,
+            Math.round(Math.log2(Math.max(medVelocity, 1) / runMedian) * 6),
+          ),
+        );
+        let score =
+          20 +
+          absolute +
+          relative +
+          Math.min(10, Math.round(engagement * 100)) +
+          Math.min(10, channels * 2 + onPlatforms.length * 2) +
+          (bestTrust === "high" ? 5 : bestTrust === "medium" ? 3 : 1);
+        // Approved recommendations, and only those, change ranking.
+        if (
+          approvedWeights.includes("source_weight:+1:high_trust") &&
+          bestTrust === "high"
+        )
+          score += 6;
+        score = Math.max(0, Math.min(100, score));
+
+        const platformsEn = onPlatforms
+          .map((p) => PLATFORM_LABEL[p]?.en ?? p)
+          .join(" and ");
+        const platformsZh = onPlatforms
+          .map((p) => PLATFORM_LABEL[p]?.zh ?? p)
+          .join("和");
+        const ratio = (medVelocity / runMedian).toFixed(1);
+        const topDays = daysBetween(top.publishedAt);
+        const freshest = backing
+          .map((s) => s.published_at)
+          .sort()
+          .reverse()[0];
+
+        const nVideos = `${clip.length} ${clip.length === 1 ? "video" : "videos"}`;
+        const whyEn = `"${top.title}" (${top.channel}) reached ${compact(top.views)} views in ${topDays} ${topDays === 1 ? "day" : "days"}. The approved source for this subject was published ${freshest}.`;
+        const whyZh = `《${top.title}》（${top.channel}）${topDays} 天内到了 ${compactZh(top.views)}次播放。这个主题的已批准来源发布于 ${freshest}。`;
+        const reasonEn = `${nVideos} on ${platformsEn} across ${channels} ${channels === 1 ? "channel" : "channels"}, running at ${compact(medVelocity)} views a day, ${ratio}x this run's median. Backed by ${backing.length} approved ${backing.length === 1 ? "source" : "sources"}, best trust ${bestTrust}.`;
+        const reasonZh = `${platformsZh}上 ${clip.length} 条视频，来自 ${channels} 个账号，日均播放 ${compactZh(medVelocity)}次，是本次运行中位数的 ${ratio} 倍。有 ${backing.length} 个已批准来源支撑，最高可信级别为 ${bestTrust}。`;
+
+        /*
+          A subject already waiting on a decision does not get a second card.
+          Section 12 asks for no duplicate topics, and two rows for one question
+          is how a review inbox stops being read.
+
+          What the run does instead is grow the one that is there: new videos
+          attach to it, and the score, the reason and the "why now" are rewritten
+          from the evidence as it now stands. Title and angle are left alone,
+          because those are editorial and may have been written by a person.
+        */
+        const prior = one<{ id: string }>(
+          `SELECT c.id FROM topic_candidate c
+             JOIN candidate_video cv ON cv.candidate_id = c.id
+             JOIN viral_video v ON v.id = cv.video_id
+            WHERE c.workspace_id = ? AND c.decision IS NULL AND v.keyword = ?
+            LIMIT 1`,
+          session.workspaceId,
+          keyword,
+        );
+        const cid = prior?.id ?? id("c");
+
+        if (prior) {
+          run(
+            `UPDATE topic_candidate SET why_en=?,why_zh=?,score=?,reason_en=?,reason_zh=?,
+                    updated_at=?,revision=revision+1 WHERE id=?`,
+            whyEn,
+            whyZh,
+            score,
+            reasonEn,
+            reasonZh,
+            t,
+            cid,
+          );
+        } else {
+          run(
+            `INSERT INTO topic_candidate
+             (id,workspace_id,run_id,title_en,title_zh,angle_en,angle_zh,why_en,why_zh,score,reason_en,reason_zh,created_at,updated_at,created_by)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            cid,
+            session.workspaceId,
+            runId,
+            titleEn,
+            titleZh,
+            `Answer it from the primary document, not from the other videos`,
+            `用一手文件来回答，而不是照着别的视频讲`,
+            whyEn,
+            whyZh,
+            score,
+            reasonEn,
+            reasonZh,
+            t,
+            t,
+            "agent:topic",
+          );
+        }
+
+        for (const s of backing) {
+          run(
+            `INSERT OR IGNORE INTO candidate_source (candidate_id,source_id) VALUES (?,?)`,
+            cid,
+            s.id,
+          );
+        }
+        for (const v of clip) {
+          const rowId = rowIdOf.get(`${v.platform}:${v.videoId}`);
+          if (rowId) {
+            run(
+              `INSERT OR IGNORE INTO candidate_video (candidate_id,video_id) VALUES (?,?)`,
+              cid,
+              rowId,
+            );
+          }
+        }
+        if (
+          bestTrust !== "high" &&
+          !one(
+            "SELECT 1 FROM candidate_risk WHERE candidate_id = ? AND note_en = ?",
+            cid,
+            "No high-trust source covers this",
+          )
+        ) {
+          run(
+            `INSERT INTO candidate_risk (id,candidate_id,level,note_en,note_zh) VALUES (?,?,?,?,?)`,
+            id("cr"),
+            cid,
+            "MEDIUM",
+            "No high-trust source covers this",
+            "没有高可信来源覆盖",
+          );
+        }
+        audit(
+          session,
+          prior ? "topic_refreshed" : "generation",
+          "topic_candidate",
+          cid,
+          null,
+          { keyword, score, videos: clip.length, run_id: runId },
+        );
+        if (prior) refreshed++;
+        else made++;
+      }
+
+      audit(session, "generation", "topic_candidate", runId, null, {
+        candidates: made,
+        refreshed,
+        videos: found.length,
+        unsourced,
+      });
       return {
-        status: made ? ("needs_review" as const) : ("failed" as const),
-        payload: { run_id: runId, candidates: made },
+        // A run that only refreshed what was already waiting still needs a
+        // human, and it is not a failure. Only finding nothing at all is.
+        status:
+          made || refreshed ? ("needs_review" as const) : ("failed" as const),
+        payload: {
+          run_id: runId,
+          candidates: made,
+          refreshed,
+          videos: found.length,
+          unsourced,
+          provider: discoveryProvider(),
+        },
         source_refs: sources.map((s) => s.id),
         confidence: 0.8,
-        risk_flags: [],
+        risk_flags: unsourced.length
+          ? [
+              {
+                level: "LOW",
+                note: `${unsourced.length} subject(s) are trending with no approved source: ${unsourced.join(", ")}`,
+              },
+            ]
+          : [],
         human_action_required: true,
       };
     },

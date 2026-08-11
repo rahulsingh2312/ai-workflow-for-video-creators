@@ -34,6 +34,7 @@ import {
   Upload,
   X,
   Calendar,
+  ExternalLink,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Lang } from "@/lib/i18n";
@@ -203,6 +204,36 @@ function pickTask<
     if (d !== 0) return d;
     return String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? ""));
   })[0];
+}
+
+/**
+ * English needs a plural, Chinese does not: 条 / 来源 / 处 are measure words and
+ * do not inflect. Without this the topic list rendered "1 sources" directly
+ * under a correct "3 sources".
+ */
+function plural(n: number, one: string, many: string) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/* View counts, in the unit each language actually reads in. */
+function compactViews(n: number, zh: boolean) {
+  if (zh) {
+    if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)} 亿`;
+    if (n >= 10_000)
+      return `${(n / 10_000).toFixed(n >= 1_000_000 ? 0 : 1)} 万`;
+    return String(n);
+  }
+  if (n >= 1_000_000)
+    return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1000)}k`;
+  return String(n);
+}
+
+function ageInDays(iso: string) {
+  return Math.max(
+    1,
+    Math.round((Date.now() - new Date(iso).getTime()) / 86_400_000),
+  );
 }
 
 /* ── Data ────────────────────────────────────────────────────────────────── */
@@ -807,6 +838,7 @@ function describeEvent(e: Row, lang: Lang) {
     ? {
         sign_in: "登录了",
         generation: "生成了内容",
+        topic_refreshed: "更新了选题的依据",
         review: "做了审核",
         lock: "锁定了脚本",
         transition: "推进了流程",
@@ -826,6 +858,7 @@ function describeEvent(e: Row, lang: Lang) {
     : {
         sign_in: "signed in",
         generation: "generated content",
+        topic_refreshed: "refreshed a topic's evidence",
         review: "reviewed something",
         lock: "locked a script",
         transition: "moved it forward",
@@ -920,7 +953,10 @@ function HomeScreen({
             <ArrowRight className="size-4" strokeWidth={2.25} />
           )}
         </span>
-        <div className="min-w-0 flex-1">
+        {/* basis, not flex-1: with `flex: 1 1 0%` this column shrank to 103px
+            at 390 and broke the headline over three lines beside dead space,
+            rather than letting the row wrap. */}
+        <div className="min-w-0 flex-1 basis-60">
           <p
             className="text-[11.5px] font-medium uppercase tracking-[0.06em]"
             style={{ color: "var(--ink-gray-4)" }}
@@ -1114,6 +1150,8 @@ function Topics({
   const links = (topics?.links as Row[]) ?? [];
   const sources = (topics?.sources as Row[]) ?? [];
   const risks = (topics?.risks as Row[]) ?? [];
+  const videos = (topics?.videos as Row[]) ?? [];
+  const videoLinks = (topics?.videoLinks as Row[]) ?? [];
 
   const scoped =
     tab === "waiting" ? candidates.filter((c) => !c.decision) : candidates;
@@ -1141,6 +1179,14 @@ function Topics({
       .map((l) => sources.find((x) => x.id === l.source_id))
       .filter(Boolean) as Row[];
   const risksFor = (id: string) => risks.filter((r) => r.candidate_id === id);
+  const videosFor = (id: string) =>
+    videoLinks
+      .filter((l) => l.candidate_id === id)
+      .map((l) => videos.find((v) => v.id === l.video_id))
+      .filter(Boolean)
+      .sort(
+        (a, b) => Number((b as Row).velocity) - Number((a as Row).velocity),
+      ) as Row[];
   const level = (score: number): "high" | "medium" | "low" =>
     score >= 80 ? "high" : score >= 65 ? "medium" : "low";
   const levelLabel = {
@@ -1197,7 +1243,9 @@ function Topics({
           className="ml-auto text-[13px]"
           style={{ color: "var(--ink-gray-5)" }}
         >
-          {scoped.length} {t("topics", "条")}
+          {zh
+            ? `${scoped.length} 条`
+            : plural(scoped.length, "topic", "topics")}
         </span>
       </div>
 
@@ -1247,6 +1295,8 @@ function Topics({
                     {g.rows.map((c) => {
                       const mine = sourcesFor(c.id);
                       const myRisks = risksFor(c.id);
+                      const clips = videosFor(c.id);
+                      const topVelocity = Number(clips[0]?.velocity ?? 0);
                       const lv = level(c.score);
                       const expanded = openId === c.id;
                       return (
@@ -1285,8 +1335,24 @@ function Topics({
                               col="tags"
                               className="gap-1.5 overflow-hidden"
                             >
+                              {topVelocity > 0 ? (
+                                <Tag
+                                  label={
+                                    zh
+                                      ? `${compactViews(topVelocity, true)}/天`
+                                      : `${compactViews(topVelocity, false)}/day`
+                                  }
+                                  dot={
+                                    topVelocity >= 100_000 ? DOT.red : DOT.amber
+                                  }
+                                />
+                              ) : null}
                               <Tag
-                                label={`${mine.length} ${t("sources", "来源")}`}
+                                label={
+                                  zh
+                                    ? `${mine.length} 来源`
+                                    : plural(mine.length, "source", "sources")
+                                }
                                 dot={DOT.gray}
                               />
                               {myRisks.slice(0, 1).map((r) => (
@@ -1364,12 +1430,95 @@ function Topics({
                                     {zh ? c.reason_zh : c.reason_en}
                                   </p>
                                 </div>
+                                {clips.length ? (
+                                  <div className="sm:col-span-2">
+                                    <p
+                                      className="text-[12px] font-medium"
+                                      style={{ color: "var(--ink-gray-5)" }}
+                                    >
+                                      {t(
+                                        "What people are watching",
+                                        "大家在看什么",
+                                      )}
+                                    </p>
+                                    <ul className="mt-1.5 space-y-0.5">
+                                      {clips.map((v) => {
+                                        const days = ageInDays(
+                                          String(v.published_at),
+                                        );
+                                        return (
+                                          <li key={v.id}>
+                                            <a
+                                              href={String(v.url)}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="-mx-2 flex items-start gap-2.5 rounded-[var(--r-sm)] px-2 py-1.5 [transition:background-color_140ms_var(--e-out)] hover:[background-color:var(--surface-white)]"
+                                            >
+                                              <span
+                                                className="mt-[2px] shrink-0 rounded-[4px] px-1.5 py-[1px] text-[11px]"
+                                                style={{
+                                                  boxShadow:
+                                                    "inset 0 0 0 1px var(--outline-gray-2)",
+                                                  color: "var(--ink-gray-6)",
+                                                }}
+                                              >
+                                                {v.platform === "youtube"
+                                                  ? "YouTube"
+                                                  : t("Channels", "视频号")}
+                                              </span>
+                                              <span className="min-w-0 flex-1">
+                                                <span
+                                                  className="block truncate text-[13px]"
+                                                  style={{
+                                                    color: "var(--ink-gray-8)",
+                                                  }}
+                                                >
+                                                  {String(v.title)}
+                                                </span>
+                                                <span
+                                                  className="mt-0.5 block text-[12px] tabular-nums"
+                                                  style={{
+                                                    color: "var(--ink-gray-5)",
+                                                  }}
+                                                >
+                                                  {String(v.channel)} ·{" "}
+                                                  {compactViews(
+                                                    Number(v.views),
+                                                    zh,
+                                                  )}
+                                                  {t(" views", " 次播放")} ·{" "}
+                                                  {zh
+                                                    ? `${days} 天前`
+                                                    : `${days}d ago`}{" "}
+                                                  ·{" "}
+                                                  {compactViews(
+                                                    Number(v.velocity),
+                                                    zh,
+                                                  )}
+                                                  {t("/day", "/天")}
+                                                </span>
+                                              </span>
+                                              <ExternalLink
+                                                className="mt-[3px] size-3.5 shrink-0"
+                                                strokeWidth={1.5}
+                                                style={{
+                                                  color: "var(--ink-gray-4)",
+                                                }}
+                                                aria-hidden
+                                              />
+                                            </a>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  </div>
+                                ) : null}
                                 <div className="sm:col-span-2">
                                   <p
                                     className="text-[12px] font-medium"
                                     style={{ color: "var(--ink-gray-5)" }}
                                   >
-                                    {t("Based on", "依据")}
+                                    {t("Sources it can cite", "可引用的来源")}
                                   </p>
                                   <ul className="mt-1 space-y-1">
                                     {mine.map((x) => (
@@ -1626,7 +1775,7 @@ function ActionBar({
             : t("Ready to lock", "可以锁定了"),
           mustFix.length
             ? t(
-                `${mustFix.length} things still need your call.`,
+                `${plural(mustFix.length, "thing", "things")} still ${mustFix.length === 1 ? "needs" : "need"} your call.`,
                 `还有 ${mustFix.length} 处等你定。`,
               )
             : t(
@@ -1846,13 +1995,13 @@ function Task({
                 subtitle={
                   mustFix.length
                     ? t(
-                        `${mustFix.length} must be handled before this can be locked.`,
+                        `${plural(mustFix.length, "thing", "things")} must be handled before this can be locked.`,
                         `有 ${mustFix.length} 处必须处理，才能锁定。`,
                       )
                     : t("Nothing is blocking you.", "没有卡住你的东西了。")
                 }
               />
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {[...mustFix, ...minor, ...resolved].map((f) => {
                   const level = LEVEL_LABEL[f.level] ?? LEVEL_LABEL.LOW;
                   const done = Boolean(f.resolution);
@@ -1867,7 +2016,7 @@ function Task({
                     */
                     <div
                       key={f.id}
-                      className="relative overflow-hidden rounded-[var(--r)] py-4 pl-5 pr-4"
+                      className="relative overflow-hidden rounded-[var(--r)] py-3 pl-4 pr-3.5"
                       style={{
                         background: done
                           ? "transparent"
@@ -1908,14 +2057,14 @@ function Task({
                         script" without spending a colour on saying it.
                       */}
                       <blockquote
-                        className="mt-3 border-l-2 pl-3 text-[15px] leading-relaxed"
+                        className="mt-2 border-l-2 pl-2.5 text-[14px] leading-snug"
                         style={{ borderColor: "var(--outline-gray-3)" }}
                       >
                         {zh ? f.claim_zh : f.claim_en}
                       </blockquote>
 
                       <p
-                        className="mt-3 text-[13.5px] leading-relaxed"
+                        className="mt-2 text-[13px] leading-snug"
                         style={{ color: "var(--ink-gray-7)" }}
                       >
                         {zh ? f.reason_zh : f.reason_en}
@@ -1927,7 +2076,7 @@ function Task({
                         is a box to type in, and they looked the same. Evidence
                         is quiet text under a label; only the input keeps a fill.
                       */}
-                      <p className="mt-3 text-[12.5px] leading-relaxed">
+                      <p className="mt-1.5 text-[12.5px] leading-snug">
                         <span
                           className="t-2xs mr-1.5 uppercase tracking-[0.06em]"
                           style={{ color: "var(--ink-gray-4)" }}
@@ -1941,7 +2090,7 @@ function Task({
 
                       {done ? (
                         <p
-                          className="mt-3 flex flex-wrap items-center gap-2 text-[13px]"
+                          className="mt-2 flex flex-wrap items-center gap-2 text-[13px]"
                           style={{ color: "var(--ink-green-3)" }}
                         >
                           <Check className="h-3.5 w-3.5" />
@@ -1956,20 +2105,32 @@ function Task({
                           ) : null}
                         </p>
                       ) : (
-                        <div className="mt-4">
-                          <Input
-                            value={reason[f.id] ?? ""}
-                            onChange={(e) =>
-                              setReason((p) => ({
-                                ...p,
-                                [f.id]: e.target.value,
-                              }))
-                            }
-                            placeholder={t(
-                              "Add a note. Required to dismiss.",
-                              "写个说明。判断它不是问题时必填。",
-                            )}
-                          />
+                        /*
+                          Note and decisions share one row.
+
+                          They used to stack, which cost every card the height of
+                          a full-width input plus its gap — four flags and the
+                          panel ran past a screen before the script itself began.
+                          The note is one short line of typing, so it sits inline
+                          and wraps to its own row only when the width genuinely
+                          runs out.
+                        */
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                          <span className="min-w-[9rem] flex-1 basis-40">
+                            <Input
+                              value={reason[f.id] ?? ""}
+                              onChange={(e) =>
+                                setReason((p) => ({
+                                  ...p,
+                                  [f.id]: e.target.value,
+                                }))
+                              }
+                              placeholder={t(
+                                "Add a note. Required to dismiss.",
+                                "写个说明。判断它不是问题时必填。",
+                              )}
+                            />
+                          </span>
                           {/*
                             Three decisions that accept the flag, and one that
                             throws it away. The dismissal is separated by a rule
@@ -1977,7 +2138,7 @@ function Task({
                             only one of the four the audit log cannot explain on
                             its own, and the server rejects it without one.
                           */}
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             {(["approved", "revised", "sourced"] as const).map(
                               (r) => (
                                 <Button
@@ -2396,8 +2557,14 @@ function Publish({
   const t = (en: string, z: string) => (zh ? z : en);
   const [url, setUrl] = useState<Record<string, string>>({});
   const [account, setAccount] = useState<Record<string, string>>({});
+  const [shownId, setShownId] = useState<string | null>(null);
   const packages = (detail?.packages as Row[]) ?? [];
   const task = detail?.task as Row | undefined;
+
+  /* Default to the first platform still waiting on a person. */
+  const nextUp = packages.find((p) => p.status !== "published") ?? packages[0];
+  const shown = packages.find((p) => p.id === shownId) ?? nextUp;
+  const recorded = packages.filter((p) => p.status === "published").length;
 
   const READY = [
     "VIDEO_READY",
@@ -2518,8 +2685,66 @@ function Publish({
         />
       ) : null}
 
+      {/*
+        One platform at a time.
+
+        Every package carries the same caption, the same checklist and nearly
+        the same tags, so stacking all three made the operator scroll past the
+        same 700px three times to find the one difference. They are also worked
+        one at a time in real life: copy, leave, post, come back, record. So the
+        screen is a switcher over one panel, and the switcher doubles as the
+        progress readout — which platforms are done, and which is next.
+      */}
+      {packages.length > 1 ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {packages.map((p) => {
+            const on = p.id === (shown?.id ?? packages[0].id);
+            const done = p.status === "published";
+            const stale = p.status === "invalid";
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setShownId(p.id)}
+                aria-current={on ? "true" : undefined}
+                className="press flex h-8 items-center gap-2 rounded-[var(--r)] px-3 text-[13.5px] [transition:background-color_140ms_var(--e-out),box-shadow_140ms_var(--e-out)]"
+                style={{
+                  background: on ? "var(--surface-gray-3)" : "transparent",
+                  boxShadow: on
+                    ? "none"
+                    : "inset 0 0 0 1px var(--outline-gray-2)",
+                  color: on ? "var(--ink-gray-9)" : "var(--ink-gray-6)",
+                  fontWeight: on ? 500 : 400,
+                }}
+              >
+                <span
+                  aria-hidden
+                  className="flex size-3.5 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    background: done ? "var(--surface-green-2)" : "transparent",
+                    boxShadow: done
+                      ? "none"
+                      : `inset 0 0 0 1.5px ${stale ? "var(--ink-red-3)" : "var(--outline-gray-3)"}`,
+                    color: "var(--ink-green-3)",
+                  }}
+                >
+                  {done ? <Check className="size-2" strokeWidth={4} /> : null}
+                </span>
+                {PLATFORM_NAME[p.platform]?.[lang] ?? p.platform}
+              </button>
+            );
+          })}
+          <Meta>
+            {t(
+              `${recorded} of ${packages.length} recorded`,
+              `${packages.length} 个里已登记 ${recorded} 个`,
+            )}
+          </Meta>
+        </div>
+      ) : null}
+
       <div className="space-y-4">
-        {packages.map((p) => {
+        {(shown ? [shown] : []).map((p) => {
           const payload = JSON.parse(p.payload as string);
           const invalid = p.status === "invalid";
           const published = p.status === "published";

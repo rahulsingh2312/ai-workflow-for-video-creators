@@ -63,6 +63,10 @@ CREATE TABLE IF NOT EXISTS source (
   published_at  TEXT,
   trust         TEXT NOT NULL CHECK (trust IN ('high','medium','low')),
   permissions   TEXT NOT NULL DEFAULT 'approved',
+  -- JSON array of the subjects this source can be cited for. It is the join
+  -- between audience demand and evidence: the Topic Agent will only raise a
+  -- candidate for a viral subject it can already ground in an approved source.
+  keywords      TEXT NOT NULL DEFAULT '[]',
   last_check    TEXT,
   created_at    TEXT NOT NULL,
   updated_at    TEXT NOT NULL,
@@ -109,6 +113,48 @@ CREATE TABLE IF NOT EXISTS candidate_risk (
   level        TEXT NOT NULL CHECK (level IN ('LOW','MEDIUM','HIGH','CRITICAL')),
   note_en      TEXT NOT NULL,
   note_zh      TEXT NOT NULL
+);
+
+-- A viral video the Topic Agent found while looking for what an audience is
+-- already watching.
+--
+-- These are deliberately not \`source\` rows. A candidate's sources flow into
+-- task_source on accept, and task_source is what grounds script generation and
+-- the claim map. A viral video is evidence that people are asking a question,
+-- never evidence of the answer, so it must not be citable as fact.
+CREATE TABLE IF NOT EXISTS viral_video (
+  id            TEXT PRIMARY KEY,
+  workspace_id  TEXT NOT NULL REFERENCES workspace(id),
+  platform      TEXT NOT NULL CHECK (platform IN ('youtube','wechat_channels')),
+  video_id      TEXT NOT NULL,
+  title         TEXT NOT NULL,
+  channel       TEXT NOT NULL,
+  url           TEXT NOT NULL,
+  thumbnail     TEXT,
+  published_at  TEXT NOT NULL,
+  views         INTEGER NOT NULL DEFAULT 0,
+  likes         INTEGER NOT NULL DEFAULT 0,
+  comments      INTEGER NOT NULL DEFAULT 0,
+  -- Views per day since publication. The ranking signal, because raw views
+  -- only measure how long a video has been up: 400k in four days is a live
+  -- question, 2M over three years is not.
+  velocity      INTEGER NOT NULL DEFAULT 0,
+  -- The subject this video was found under. Matches source.keywords.
+  keyword       TEXT NOT NULL,
+  fetched_at    TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  created_by    TEXT,
+  status        TEXT NOT NULL DEFAULT 'active',
+  revision      INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (workspace_id, platform, video_id)
+);
+
+-- The proof shown to a reviewer: the videos that caused this candidate.
+CREATE TABLE IF NOT EXISTS candidate_video (
+  candidate_id TEXT NOT NULL REFERENCES topic_candidate(id),
+  video_id     TEXT NOT NULL REFERENCES viral_video(id),
+  PRIMARY KEY (candidate_id, video_id)
 );
 
 CREATE TABLE IF NOT EXISTS content_task (
@@ -403,4 +449,5 @@ CREATE INDEX IF NOT EXISTS idx_conv_ws        ON conversation(workspace_id, crea
 CREATE INDEX IF NOT EXISTS idx_lead_ws        ON lead(workspace_id, status);
 CREATE INDEX IF NOT EXISTS idx_metric_ws      ON metric_snapshot(workspace_id, period_end);
 CREATE INDEX IF NOT EXISTS idx_run_ws         ON agent_run(workspace_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_viral_ws       ON viral_video(workspace_id, keyword, velocity);
 `;

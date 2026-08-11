@@ -94,7 +94,9 @@
   --rule-strong: #303036;
   --bone: #ededf0;
   --bone-dim: #a1a1aa;
-  --bone-faint: #7c7c85;
+  /* 4.45:1 on the raised card ground was under the floor; this clears 4.9:1
+     on every ground the token is used against. */
+  --bone-faint: #87878f;
 
   --lamp-red: #e5484d;
   --lamp-amber: #ffb224;
@@ -515,6 +517,16 @@ em {
   --ink-gray-4: #6a6a70;
   --ink-gray-5: #5e5e66;
 
+  /*
+    The three state inks, raised to clear 4.5:1 on their own tinted grounds.
+    Frappe's light values put a badge at 2.93:1, which made the three colours
+    that actually carry meaning the least legible thing on the surface. Their
+    dark twins already sat near 5.7:1 and are untouched.
+  */
+  --ink-amber-3: #8a5300;
+  --ink-green-3: #14764a;
+  --ink-red-4: #c62a2f;
+
   color-scheme: light;
   background: var(--surface-white);
   color: var(--ink-gray-8);
@@ -836,4 +848,3 @@ em {
     display: none;
   }
 }
-

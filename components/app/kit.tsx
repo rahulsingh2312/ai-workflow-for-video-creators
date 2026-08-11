@@ -21,29 +21,43 @@ import { clsx } from "@/lib/clsx";
 
 export type Tone = "gray" | "green" | "red" | "amber" | "blue";
 
-const TONE: Record<Tone, { ink: string; surface: string; outline: string }> = {
+/*
+  `ink` is for text on `surface` and has to clear 4.5:1. `lamp` is for a 6px
+  dot, which has no such floor and needs to stay recognisably the state colour:
+  the ink that makes an amber badge legible on light is a dark brown, and a
+  dark brown dot is not amber any more. Two roles, two values.
+*/
+const TONE: Record<
+  Tone,
+  { ink: string; lamp: string; surface: string; outline: string }
+> = {
   gray: {
     ink: "var(--ink-gray-7)",
+    lamp: "var(--ink-gray-5)",
     surface: "var(--surface-gray-2)",
     outline: "var(--outline-gray-1)",
   },
   green: {
     ink: "var(--ink-green-3)",
+    lamp: "var(--ink-green-2)",
     surface: "var(--surface-green-2)",
     outline: "var(--outline-green-1)",
   },
   red: {
     ink: "var(--ink-red-4)",
+    lamp: "var(--ink-red-3)",
     surface: "var(--surface-red-2)",
     outline: "var(--outline-red-1)",
   },
   amber: {
     ink: "var(--ink-amber-3)",
+    lamp: "var(--ink-amber-2)",
     surface: "var(--surface-amber-2)",
     outline: "var(--outline-amber-1)",
   },
   blue: {
     ink: "var(--ink-blue-3)",
+    lamp: "var(--ink-blue-2)",
     surface: "var(--surface-blue-2)",
     outline: "var(--outline-blue-1)",
   },
@@ -89,23 +103,54 @@ export function Button({
   full?: boolean;
   className?: string;
 }) {
-  const styles: React.CSSProperties =
-    variant === "solid"
-      ? { background: "var(--surface-gray-7)", color: "var(--ink-white)" }
-      : variant === "outline"
-        ? {
-            background: "var(--surface-white)",
-            color: "var(--ink-gray-8)",
-            boxShadow: "0 0 0 1px var(--outline-gray-2)",
-          }
-        : variant === "ghost"
-          ? { background: "transparent", color: "var(--ink-gray-7)" }
-          : variant === "danger"
-            ? { background: "var(--surface-red-2)", color: "var(--ink-red-4)" }
-            : {
-                background: "var(--surface-gray-2)",
-                color: "var(--ink-gray-8)",
-              };
+  /*
+    Paint travels as custom properties rather than as an inline `background`.
+    An inline background beats any class, which is why the `hov:bg-…` rule that
+    used to sit on this button was inert, and why the fallback was a
+    `brightness(0.96)` filter — on a #202026 ground that moves the colour by
+    one step out of 255, so nine call sites had no hover at all in dark. Going
+    through variables lets the class win, and `background-color` is already in
+    the transition list, so the 150ms fade comes free.
+  */
+  const PAINT: Record<
+    ButtonVariant,
+    { bg: string; hover: string; ink: string }
+  > = {
+    solid: {
+      bg: "var(--surface-gray-7)",
+      hover: "var(--surface-gray-6)",
+      ink: "var(--ink-white)",
+    },
+    outline: {
+      bg: "var(--surface-white)",
+      hover: "var(--surface-gray-1)",
+      ink: "var(--ink-gray-8)",
+    },
+    ghost: {
+      bg: "transparent",
+      hover: "var(--surface-gray-2)",
+      ink: "var(--ink-gray-7)",
+    },
+    danger: {
+      bg: "var(--surface-red-2)",
+      hover: "var(--surface-red-3)",
+      ink: "var(--ink-red-4)",
+    },
+    subtle: {
+      bg: "var(--surface-gray-2)",
+      hover: "var(--surface-gray-3)",
+      ink: "var(--ink-gray-8)",
+    },
+  };
+  const paint = PAINT[variant];
+  const styles: React.CSSProperties = {
+    ["--btn-bg" as string]: paint.bg,
+    ["--btn-bg-h" as string]: paint.hover,
+    color: paint.ink,
+    ...(variant === "outline"
+      ? { boxShadow: "0 0 0 1px var(--outline-gray-2)" }
+      : null),
+  };
 
   return (
     <button
@@ -121,8 +166,7 @@ export function Button({
         "active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100",
         SIZE[size],
         full && "w-full",
-        "hov:brightness-[0.96]",
-        variant === "ghost" && "hov:bg-[var(--surface-gray-2)]",
+        "cursor-pointer bg-[var(--btn-bg)] hov:bg-[var(--btn-bg-h)]",
         className,
       )}
     >
@@ -178,7 +222,7 @@ export function Dot({ tone = "gray" }: { tone?: Tone }) {
     <span
       aria-hidden
       className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-      style={{ background: TONE[tone].ink }}
+      style={{ background: TONE[tone].lamp }}
     />
   );
 }
@@ -390,7 +434,11 @@ export function Field({
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className="t-xs mt-0.5" style={{ color: "var(--ink-gray-4)" }}>
+        <p
+          id={hintId}
+          className="t-xs mt-0.5"
+          style={{ color: "var(--ink-gray-4)" }}
+        >
           {hint}
         </p>
       ) : null}
