@@ -19,7 +19,9 @@ import {
   invalidatePackages,
   proveAll,
   proveRoute,
+  runForward,
 } from "@/lib/server/interlocking";
+import { ask } from "@/lib/server/assistant";
 import {
   analyse,
   factCheck,
@@ -58,22 +60,6 @@ function fail(err: unknown) {
   const message = err instanceof Error ? err.message : String(err);
   // An integration that breaks stays visible with a clear error rather than a 500 with nothing in it.
   return NextResponse.json({ error: "server_error", message }, { status: 500 });
-}
-
-/**
- * Advance as far as the interlocking allows after an action that succeeded.
- *
- * The action itself is already done and recorded. If the next signal holds,
- * that is the correct outcome of the workflow, not a failure of the request,
- * so it must not turn a successful write into an error the user sees.
- */
-function runForward(s: Session, taskId: string, reason: string) {
-  try {
-    advance(s, taskId, reason);
-  } catch (err) {
-    if (err instanceof HttpError && err.code === "signal_at_danger") return;
-    throw err;
-  }
 }
 
 /* ── Read helpers ────────────────────────────────────────────────────────── */
@@ -338,6 +324,19 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     const s = await requireSession();
 
     switch (head) {
+      /* ── Assistant ──────────────────────────────────────────────────── */
+      case "assistant": {
+        // No extra role gate here on purpose. The assistant only ever calls the
+        // same functions the buttons call, and those check their own roles, so
+        // a second gate here would either duplicate them or drift from them.
+        const reply = await ask(
+          s,
+          String(input.message ?? ""),
+          input.lang === "zh" ? "zh" : "en",
+        );
+        return ok(reply);
+      }
+
       /* ── Topics ─────────────────────────────────────────────────────── */
       case "topics": {
         if (!a) {

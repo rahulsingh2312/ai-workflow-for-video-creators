@@ -75,6 +75,7 @@ import {
   PrimaryAction,
 } from "@/components/app/Shell";
 import { ScriptReader, type SourceRow } from "@/components/app/ScriptReader";
+import { Assistant } from "@/components/app/Assistant";
 import {
   Avatar,
   CellIcon,
@@ -301,6 +302,7 @@ export function Workspace({ lang, session }: { lang: Lang; session: Session }) {
   const [config, setConfig] = useState<Row[]>([]);
   const [activity, setActivity] = useState<Row[]>([]);
   const [navOpen, setNavOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   /* Escape closes the drawer. Anything that covers the screen has to. */
   useEffect(() => {
@@ -629,6 +631,33 @@ export function Workspace({ lang, session }: { lang: Lang; session: Session }) {
           )}
         </div>
       </main>
+
+      {/*
+        Available from every screen rather than living on one, because the
+        point of it is not having to know which screen owns the thing you want.
+      */}
+      {!assistantOpen ? (
+        <button
+          type="button"
+          onClick={() => setAssistantOpen(true)}
+          aria-label={t("Ask for anything", "有事直接说")}
+          className="fixed bottom-5 right-5 z-30 flex items-center gap-2 rounded-full py-2.5 pl-3.5 pr-4 text-[13px] font-medium [transition:transform_140ms_var(--e-out)] hover:scale-[1.03]"
+          style={{
+            background: "var(--ink-gray-9)",
+            color: "var(--surface-white)",
+            boxShadow: "var(--sh-lg)",
+          }}
+        >
+          <Sparkles className="size-4" strokeWidth={2} aria-hidden />
+          {t("Ask", "问我")}
+        </button>
+      ) : null}
+      <Assistant
+        lang={lang}
+        open={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        go={(s) => go(s as Screen)}
+      />
     </div>
   );
 }
@@ -917,8 +946,22 @@ function HomeScreen({
         carrying the state. A 44px saturated disc made this the loudest object
         on a screen whose job is to be scanned.
       */}
+      {/*
+        One line, and it stays one line.
+
+        This was a hero block: an eyebrow, a 19px headline and a sentence under
+        it, for what is only ever a pointer at the next thing to do. At that
+        size it competed with the page it was introducing. The tone rule and the
+        icon still carry the state, the title carries the instruction, and the
+        detail trails after it in grey.
+
+        No flex-wrap, so the button cannot drop to a second row; the text truncates
+        instead. Below `sm` the trailing clause is dropped rather than truncated,
+        because half a sentence reads worse than none and the title alone is
+        already an instruction.
+      */}
       <div
-        className="relative mb-6 flex flex-wrap items-center gap-5 overflow-hidden rounded-[var(--r)] py-5 pl-6 pr-5"
+        className="relative mb-4 flex items-center gap-2.5 overflow-hidden rounded-[var(--r)] py-2 pl-3.5 pr-2.5"
         style={{
           background: "var(--surface-cards)",
           boxShadow: "inset 0 0 0 1px var(--outline-gray-2)",
@@ -935,7 +978,7 @@ function HomeScreen({
           }}
         />
         <span
-          className="flex size-8 shrink-0 items-center justify-center rounded-full"
+          className="flex size-5 shrink-0 items-center justify-center rounded-full"
           style={{
             background:
               next.tone === "green"
@@ -948,33 +991,28 @@ function HomeScreen({
           }}
         >
           {next.tone === "green" ? (
-            <Check className="size-4" strokeWidth={2.25} />
+            <Check className="size-3" strokeWidth={2.5} />
           ) : (
-            <ArrowRight className="size-4" strokeWidth={2.25} />
+            <ArrowRight className="size-3" strokeWidth={2.5} />
           )}
         </span>
-        {/* basis, not flex-1: with `flex: 1 1 0%` this column shrank to 103px
-            at 390 and broke the headline over three lines beside dead space,
-            rather than letting the row wrap. */}
-        <div className="min-w-0 flex-1 basis-60">
-          <p
-            className="text-[11.5px] font-medium uppercase tracking-[0.06em]"
-            style={{ color: "var(--ink-gray-4)" }}
+        <p className="min-w-0 flex-1 truncate text-[13px]">
+          <span className="font-medium">{next.title}</span>
+          <span
+            className="hidden sm:inline"
+            style={{ color: "var(--ink-gray-5)" }}
           >
-            {t("Next", "下一步")}
-          </p>
-          <h2 className="mt-1.5 text-[19px] font-medium leading-tight tracking-[-0.015em]">
-            {next.title}
-          </h2>
-          <p
-            className="mt-1 text-[14px]"
-            style={{ color: "var(--ink-gray-6)" }}
-          >
+            {" · "}
             {next.body}
-          </p>
-        </div>
+          </span>
+        </p>
         {next.screen ? (
-          <Button variant="solid" size="md" onClick={() => go(next.screen!)}>
+          <Button
+            variant="solid"
+            size="sm"
+            className="shrink-0"
+            onClick={() => go(next.screen!)}
+          >
             {next.cta}
           </Button>
         ) : null}
@@ -1679,9 +1717,15 @@ function ActionBar({
     gray: "var(--outline-gray-3)",
   };
 
+  /*
+    Same slim line as the one on Home, for the same reason: this is a pointer at
+    the next action, not a headline. It stays on one row — the button never
+    wraps below, the sentence truncates instead — and below `sm` the trailing
+    clause is dropped rather than cut mid-phrase.
+  */
   const box = (children: React.ReactNode, tone: Tone = "gray") => (
     <div
-      className="relative flex flex-wrap items-center gap-x-5 gap-y-3 overflow-hidden rounded-[var(--r)] py-4 pl-5 pr-4"
+      className="relative flex items-center gap-2.5 overflow-hidden rounded-[var(--r)] py-2 pl-3.5 pr-2.5"
       style={{
         background: "var(--surface-cards)",
         boxShadow: "inset 0 0 0 1px var(--outline-gray-2)",
@@ -1696,22 +1740,23 @@ function ActionBar({
     </div>
   );
   const copy = (title: string, body: string, tone: Tone = "gray") => (
-    <div className="min-w-0 flex-1">
-      <p className="flex items-center gap-2 text-[16px] font-medium tracking-[-0.012em]">
+    <p className="flex min-w-0 flex-1 items-center gap-2 truncate text-[13px]">
+      <span
+        aria-hidden
+        className="size-1.5 shrink-0 rounded-full"
+        style={{ background: TONE_INK[tone] ?? TONE_INK.gray }}
+      />
+      <span className="min-w-0 truncate">
+        <span className="font-medium">{title}</span>
         <span
-          aria-hidden
-          className="size-2 shrink-0 rounded-full"
-          style={{ background: TONE_INK[tone] ?? TONE_INK.gray }}
-        />
-        {title}
-      </p>
-      <p
-        className="mt-1 pl-4 text-[13.5px] leading-relaxed"
-        style={{ color: "var(--ink-gray-6)" }}
-      >
-        {body}
-      </p>
-    </div>
+          className="hidden sm:inline"
+          style={{ color: "var(--ink-gray-5)" }}
+        >
+          {" · "}
+          {body}
+        </span>
+      </span>
+    </p>
   );
 
   if (!latest) {
@@ -1727,7 +1772,8 @@ function ActionBar({
         )}
         <Button
           variant="solid"
-          size="md"
+          size="sm"
+          className="shrink-0"
           icon={Sparkles}
           loading={busy}
           onClick={() =>
@@ -1753,7 +1799,8 @@ function ActionBar({
         )}
         <Button
           variant="solid"
-          size="md"
+          size="sm"
+          className="shrink-0"
           icon={Check}
           loading={busy}
           onClick={() =>
@@ -1786,7 +1833,8 @@ function ActionBar({
         )}
         <Button
           variant="solid"
-          size="md"
+          size="sm"
+          className="shrink-0"
           icon={Lock}
           disabled={mustFix.length > 0}
           loading={busy}
@@ -1812,7 +1860,8 @@ function ActionBar({
         )}
         <Button
           variant="solid"
-          size="md"
+          size="sm"
+          className="shrink-0"
           loading={busy}
           onClick={() =>
             act(`tasks/${task.id}/assign`, {
