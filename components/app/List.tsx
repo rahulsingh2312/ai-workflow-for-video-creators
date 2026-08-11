@@ -23,19 +23,36 @@ import { clsx } from "@/lib/clsx";
   assembled.
 */
 
+/**
+ * A list takes up to four column sets: the full one, plus the narrower
+ * arrangements it collapses to as the list itself gets narrower. The
+ * breakpoints live in globals.css as container queries; each set here just
+ * has to match the cells that survive at that width, which the cells declare
+ * for themselves with `col`.
+ */
 export function List({
   columns,
+  columnsMd,
+  columnsSm,
+  columnsXs,
   children,
   className,
 }: {
   columns: string[];
+  columnsMd?: string[];
+  columnsSm?: string[];
+  columnsXs?: string[];
   children: React.ReactNode;
   className?: string;
 }) {
+  const vars: Record<string, string> = { "--cols": columns.join(" ") };
+  if (columnsMd) vars["--cols-md"] = columnsMd.join(" ");
+  if (columnsSm) vars["--cols-sm"] = columnsSm.join(" ");
+  if (columnsXs) vars["--cols-xs"] = columnsXs.join(" ");
   return (
     <div
       className={clsx("list", className)}
-      style={{ ["--cols" as string]: columns.join(" ") }}
+      style={vars as React.CSSProperties}
     >
       {children}
     </div>
@@ -56,9 +73,19 @@ export function ListRow({
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
+      /*
+        A div with role="button" does not get the browser's keyboard handling,
+        so Space has to be caught here — and prevented, or it also fires the
+        page's scroll default and throws the row you just opened off screen.
+      */
       onKeyDown={
         onClick
-          ? (e) => (e.key === "Enter" || e.key === " ") && onClick()
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                if (!e.repeat) onClick();
+              }
+            }
           : undefined
       }
       className={clsx("list-row h-10", onClick && "cursor-pointer", className)}
@@ -71,12 +98,18 @@ export function ListRow({
 export function ListCell({
   children,
   className,
+  col,
 }: {
   children?: React.ReactNode;
   className?: string;
+  /** Names the track, so the container queries can drop it on a narrow list. */
+  col?: "rank" | "title" | "tags" | "date" | "who" | "priority";
 }) {
   return (
-    <div className={clsx("flex min-w-0 items-center", className)}>
+    <div
+      data-col={col}
+      className={clsx("flex min-w-0 items-center", className)}
+    >
       {children}
     </div>
   );
@@ -133,12 +166,17 @@ export function ListGroupHeader({
 
 /* ── Badges ──────────────────────────────────────────────────────────────── */
 
+/*
+  `--surface-{amber,green,blue,violet}-6` do not exist in either theme, so
+  those dots were computing to transparent: the source-trust indicator, which
+  is the only thing distinguishing an approved source from one that still
+  needs checking, rendered as an empty 14px indent. The -3 steps are defined
+  in both themes and match the inks used for the same states elsewhere.
+*/
 export const DOT: Record<string, string> = {
   red: "var(--surface-red-6)",
-  blue: "var(--surface-blue-6)",
-  green: "var(--surface-green-6)",
-  amber: "var(--surface-amber-6)",
-  violet: "var(--surface-violet-6)",
+  green: "var(--surface-green-3)",
+  amber: "var(--surface-amber-3)",
   gray: "var(--surface-gray-6)",
 };
 

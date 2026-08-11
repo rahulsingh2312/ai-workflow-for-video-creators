@@ -1,7 +1,16 @@
 "use client";
 
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type { LucideIcon } from "lucide-react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Copy, Loader2 } from "lucide-react";
 import { clsx } from "@/lib/clsx";
 
 /*
@@ -61,6 +70,7 @@ export function Button({
   loading,
   type = "button",
   title,
+  ariaLabel,
   full,
   className,
 }: {
@@ -74,6 +84,8 @@ export function Button({
   loading?: boolean;
   type?: "button" | "submit";
   title?: string;
+  /** Required on an icon-only button: the glyph itself is aria-hidden. */
+  ariaLabel?: string;
   full?: boolean;
   className?: string;
 }) {
@@ -101,6 +113,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled || loading}
       title={title}
+      aria-label={ariaLabel}
       style={styles}
       className={clsx(
         "inline-flex shrink-0 items-center justify-center whitespace-nowrap font-medium",
@@ -297,11 +310,19 @@ export function CheckRow({
 }) {
   return (
     <li className="flex items-start gap-2.5 py-1.5">
+      {/*
+        A condition that has not been met yet is outstanding, not failed. This
+        used to fill unmet rows with the red surface, so a task at the start of
+        its checklist showed a column of red discs and read as broken. Unmet is
+        now an empty ring; only the met ones take a colour, because those are
+        the ones carrying a result.
+      */}
       <span
         className="mt-[1px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
         style={{
-          background: done ? "var(--surface-green-2)" : "var(--surface-red-2)",
-          color: done ? "var(--ink-green-3)" : "var(--ink-red-4)",
+          background: done ? "var(--surface-green-2)" : "transparent",
+          boxShadow: done ? "none" : "inset 0 0 0 1.5px var(--outline-gray-3)",
+          color: done ? "var(--ink-green-3)" : "transparent",
         }}
       >
         {done ? (
@@ -330,6 +351,16 @@ export function CheckRow({
 
 /* ── Form controls ───────────────────────────────────────────────────────── */
 
+/*
+  A label with no `htmlFor` names nothing. Most call sites pass no id, so the
+  field mints one and hands it down through context: the control picks it up
+  automatically, an explicitly-passed id still wins, and the hint and error
+  become the control's description rather than loose text near it.
+*/
+const FieldCtx = createContext<{ id: string; describedBy?: string } | null>(
+  null,
+);
+
 export function Field({
   label,
   hint,
@@ -343,23 +374,38 @@ export function Field({
   children: React.ReactNode;
   id?: string;
 }) {
+  const auto = useId();
+  const forId = id ?? auto;
+  const hintId = hint ? `${auto}-hint` : undefined;
+  const errId = error ? `${auto}-error` : undefined;
+  const describedBy = [hintId, errId].filter(Boolean).join(" ") || undefined;
+
   return (
     <div>
       <label
-        htmlFor={id}
+        htmlFor={forId}
         className="t-xs block font-medium"
         style={{ color: "var(--ink-gray-6)" }}
       >
         {label}
       </label>
       {hint ? (
-        <p className="t-xs mt-0.5" style={{ color: "var(--ink-gray-4)" }}>
+        <p id={hintId} className="t-xs mt-0.5" style={{ color: "var(--ink-gray-4)" }}>
           {hint}
         </p>
       ) : null}
-      <div className="mt-1.5">{children}</div>
+      <div className="mt-1.5">
+        <FieldCtx.Provider value={{ id: forId, describedBy }}>
+          {children}
+        </FieldCtx.Provider>
+      </div>
       {error ? (
-        <p className="t-xs mt-1" style={{ color: "var(--ink-red-4)" }}>
+        <p
+          id={errId}
+          role="alert"
+          className="t-xs mt-1"
+          style={{ color: "var(--ink-red-4)" }}
+        >
           {error}
         </p>
       ) : null}
@@ -382,9 +428,12 @@ const controlStyle: React.CSSProperties = {
 };
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  const f = useContext(FieldCtx);
   return (
     <input
       {...props}
+      id={props.id ?? f?.id}
+      aria-describedby={props["aria-describedby"] ?? f?.describedBy}
       style={{ ...controlStyle, ...props.style }}
       className={clsx("h-8", controlClass, props.className)}
     />
@@ -394,9 +443,12 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 export function Textarea(
   props: React.TextareaHTMLAttributes<HTMLTextAreaElement>,
 ) {
+  const f = useContext(FieldCtx);
   return (
     <textarea
       {...props}
+      id={props.id ?? f?.id}
+      aria-describedby={props["aria-describedby"] ?? f?.describedBy}
       style={{ ...controlStyle, ...props.style }}
       className={clsx("py-2 leading-normal", controlClass, props.className)}
     />
@@ -495,5 +547,111 @@ export function PageHead({
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
+  );
+}
+
+/* ── Copy ────────────────────────────────────────────────────────────────── */
+
+/**
+ * Copy to clipboard.
+ *
+ * The publish screen exists to hand words to a person who will paste them into
+ * someone else's app, so this is the most-used control on it. Three details
+ * make it feel like it worked:
+ *
+ * - The label swaps to a confirmation and back after 1.6s, so the feedback is
+ *   in the control the finger is already on rather than in a toast across the
+ *   screen.
+ * - The swap is masked with a short blur. Two labels crossfading in the same
+ *   box read as two objects sliding past each other; the blur bridges them so
+ *   it reads as one thing changing its mind.
+ * - The timer is cleared on unmount, because a state update after the button
+ *   is gone is a warning in the console and a bug waiting for a slower device.
+ */
+export function CopyButton({
+  value,
+  label,
+  copiedLabel,
+  className,
+}: {
+  value: string;
+  label: string;
+  copiedLabel: string;
+  className?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  const copy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      /* Clipboard is permission-gated and can simply say no. Falling back to a
+         selection keeps the text reachable instead of failing silently. */
+      const el = document.createElement("textarea");
+      el.value = value;
+      el.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(el);
+      el.select();
+      try {
+        document.execCommand("copy");
+      } catch {
+        /* nothing left to try */
+      }
+      el.remove();
+    }
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 1600);
+  }, [value]);
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label={label}
+      className={clsx(
+        "press inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[var(--r-sm)] px-2 text-[12.5px] font-medium",
+        "[transition:background-color_140ms_var(--e-out),color_140ms_var(--e-out)]",
+        "hov:bg-[var(--surface-gray-3)]",
+        className,
+      )}
+      style={{ color: copied ? "var(--ink-green-3)" : "var(--ink-gray-6)" }}
+    >
+      <span
+        className="relative flex size-3.5 shrink-0 items-center justify-center"
+        aria-hidden
+      >
+        <Copy
+          className={clsx(
+            "absolute size-3.5 [transition:opacity_180ms_var(--e-out),filter_180ms_var(--e-out)]",
+            copied ? "opacity-0 blur-[2px]" : "opacity-100 blur-0",
+          )}
+          strokeWidth={1.75}
+        />
+        <Check
+          className={clsx(
+            "absolute size-3.5 [transition:opacity_180ms_var(--e-out),filter_180ms_var(--e-out)]",
+            copied ? "opacity-100 blur-0" : "opacity-0 blur-[2px]",
+          )}
+          strokeWidth={2.25}
+        />
+      </span>
+      <span
+        className={clsx(
+          "[transition:filter_180ms_var(--e-out)]",
+          copied ? "blur-0" : "blur-0",
+        )}
+      >
+        {copied ? copiedLabel : label}
+      </span>
+    </button>
   );
 }

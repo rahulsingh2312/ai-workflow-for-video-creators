@@ -103,6 +103,13 @@
   --fg-amber: #f5b31b;
   --fg-green: #4cc38a;
 
+  /*
+    The focus ring is not a state, so it does not get a state colour. On ink it
+    can afford to be the amber, which reads at 10.8:1; on paper that same amber
+    falls to 1.94:1 and a keyboard user simply cannot see where they are.
+  */
+  --focus: var(--lamp-amber);
+
   /* A tint of the aspect, for the ground behind a lit indicator. */
   --wash-red: rgba(229, 72, 77, 0.14);
   --wash-amber: rgba(255, 178, 36, 0.14);
@@ -139,6 +146,8 @@
   --fg-red: #c62a2f;
   --fg-amber: #8a5300;
   --fg-green: #14764a;
+
+  --focus: #16161a;
 
   --wash-red: rgba(220, 62, 66, 0.1);
   --wash-amber: rgba(240, 169, 12, 0.14);
@@ -204,7 +213,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--lamp-amber);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -231,6 +240,18 @@ a {
   font-style: normal;
   font-family: var(--f-sans);
   color: var(--bone);
+  /*
+    The Latin rules set an em 5.5% larger and, inside a heading, lighter than
+    the run around it. Both corrections exist for a serif italic and neither
+    survives contact with Han characters: the marked words came out thinner and
+    a hair taller than their neighbours, which reads as de-emphasis and as a
+    rendering fault. Chinese takes its emphasis in weight, which is what the
+    typography actually supports.
+  */
+  font-size: 1em;
+  letter-spacing: inherit;
+  line-height: inherit;
+  font-weight: 600;
 }
 
 .measure {
@@ -305,6 +326,20 @@ em {
 .display em {
   letter-spacing: 0.004em;
   font-weight: 450;
+  /*
+    Newsreader's ascent and descent are taller than Geist's, and the em is set
+    at 1.055em on top of that, so a line containing one grows its own line box
+    and the leading inside a multi-line heading goes uneven. Zeroing the
+    inline element's line-height makes the parent's strut the only thing
+    setting the rhythm. Measured: headings snap back to whole line boxes.
+  */
+  line-height: 0;
+}
+
+:lang(zh) .display em,
+:lang(zh) .display .voice {
+  font-weight: 800;
+  letter-spacing: inherit;
 }
 
 /* Editorial standfirst. Serif roman, set for reading rather than scanning. */
@@ -320,6 +355,10 @@ em {
   font-size: 1em;
   font-weight: 450;
   color: var(--bone);
+}
+:lang(zh) .lede em,
+:lang(zh) .lede .voice {
+  font-weight: 600;
 }
 :lang(zh) .lede {
   font-family: var(--f-sans);
@@ -467,6 +506,15 @@ em {
 
   --e-out: cubic-bezier(0.23, 1, 0.32, 1);
 
+  /*
+    Frappe's stock light greys stop at #999999 for the tertiary ink, which is
+    2.6:1 on white: sidebar labels, counts, timestamps and tile captions were
+    all below the floor. These two land at 5.4:1 and 6.4:1 and keep the two
+    steps distinct, because they sit next to each other in the rail.
+  */
+  --ink-gray-4: #6a6a70;
+  --ink-gray-5: #5e5e66;
+
   color-scheme: light;
   background: var(--surface-white);
   color: var(--ink-gray-8);
@@ -501,7 +549,7 @@ em {
   --ink-gray-7: #b0b0b8;
   --ink-gray-6: #9a9aa3;
   --ink-gray-5: #82828c;
-  --ink-gray-4: #74747e;
+  --ink-gray-4: #7e7e88;
 }
 
 [data-theme="dark"] [data-surface="app"] {
@@ -557,7 +605,7 @@ em {
   color: inherit;
 }
 [data-surface="app"] :focus-visible {
-  outline: 2px solid var(--ink-blue-2);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
   border-radius: var(--r-sm);
 }
@@ -618,6 +666,17 @@ em {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  /*
+    Reduced motion means less movement, not none: the blanket reset above
+    froze every loading spinner at a single frame, so an action that takes a
+    few seconds looked like an interface that had hung. A spinner reports work
+    in flight, which is exactly the kind of motion the preference keeps.
+  */
+  .animate-spin {
+    animation-duration: 1.4s !important;
+    animation-iteration-count: infinite !important;
   }
 }
 
@@ -686,6 +745,16 @@ em {
 [data-surface="app"] .list {
   --gutter: 12px;
   margin-inline: calc(var(--gutter) * -1);
+  /*
+    Every trailing track is a fixed width, so on a narrow screen the flexible
+    title track is the only one that can yield and it collapses to zero: the
+    headline of every row rendered at 0px wide and the page scrolled sideways.
+    The tracks are dropped from the least load-bearing end inwards as the list
+    itself gets narrower. A container query rather than a media query because
+    the rail returns at `lg` and takes 248px back off the list at exactly the
+    width a viewport query would call roomy.
+  */
+  container-type: inline-size;
 }
 
 [data-surface="app"] .list-row {
@@ -718,6 +787,16 @@ em {
   box-shadow: none;
 }
 
+/* `.list-row:hover` is gated behind a fine pointer, so touch had no feedback
+   at all between tapping a row and the next screen arriving. */
+[data-surface="app"] .list-row:active {
+  background: var(--rail-active);
+  box-shadow: none;
+}
+[data-surface="app"] .list-row:active + .list-row {
+  box-shadow: none;
+}
+
 [data-surface="app"] .list-head {
   display: grid;
   grid-template-columns: var(--cols);
@@ -728,3 +807,33 @@ em {
   font-size: 12px;
   color: var(--ink-gray-5);
 }
+
+@container (max-width: 900px) {
+  [data-surface="app"] .list-row,
+  [data-surface="app"] .list-head {
+    grid-template-columns: var(--cols-md, var(--cols));
+  }
+  [data-surface="app"] [data-col="tags"] {
+    display: none;
+  }
+}
+@container (max-width: 640px) {
+  [data-surface="app"] .list-row,
+  [data-surface="app"] .list-head {
+    grid-template-columns: var(--cols-sm, var(--cols-md, var(--cols)));
+  }
+  [data-surface="app"] [data-col="date"],
+  [data-surface="app"] [data-col="who"] {
+    display: none;
+  }
+}
+@container (max-width: 420px) {
+  [data-surface="app"] .list-row,
+  [data-surface="app"] .list-head {
+    grid-template-columns: var(--cols-xs, var(--cols-sm, var(--cols)));
+  }
+  [data-surface="app"] [data-col="rank"] {
+    display: none;
+  }
+}
+

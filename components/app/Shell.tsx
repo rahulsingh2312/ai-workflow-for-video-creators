@@ -40,9 +40,21 @@ export function Rail({
     <aside
       className={clsx(
         "fixed inset-y-0 left-0 z-40 flex w-[248px] shrink-0 flex-col",
-        "[transition:transform_220ms_var(--e-out)]",
-        "lg:sticky lg:top-0 lg:h-dvh lg:translate-x-0",
-        open ? "translate-x-0" : "-translate-x-full",
+        /*
+          Two things were wrong here. Tailwind v4 emits `-translate-x-full` as
+          the `translate` property, not `transform`, so a transition naming
+          `transform` was animating a property that never changed and the
+          drawer simply teleported. And a closed drawer that is merely
+          translated offscreen keeps every control in the tab order: on a phone
+          the first thirteen Tab presses landed on invisible buttons before
+          reaching "Open menu". `visibility` fixes the tab order and the
+          accessibility tree, and because it is in the transition list it holds
+          `visible` for the full 220ms, so the slide is still seen on the way
+          out.
+        */
+        "[transition:translate_220ms_var(--e-out),visibility_220ms_var(--e-out)]",
+        "lg:sticky lg:top-0 lg:h-dvh lg:visible lg:translate-x-0",
+        open ? "visible translate-x-0" : "invisible -translate-x-full",
       )}
       style={{ background: "var(--rail)" }}
     >
@@ -94,11 +106,11 @@ export function Rail({
         className="mt-2 flex-1 overflow-y-auto px-2 pb-3"
       >
         {groups.map((g, gi) => (
-          <div key={g.label ?? gi} className={gi ? "mt-5" : ""}>
+          <div key={g.label ?? gi} className={gi ? "mt-6" : ""}>
             {g.label ? (
-              <div className="flex items-center justify-between px-2 pb-1">
+              <div className="flex items-center justify-between px-2.5 pb-1.5 pt-1">
                 <span
-                  className="text-[13px]"
+                  className="text-[11.5px] font-medium uppercase tracking-[0.06em]"
                   style={{ color: "var(--ink-gray-4)" }}
                 >
                   {g.label}
@@ -129,21 +141,31 @@ export function Rail({
                       type="button"
                       onClick={() => onSelect(item.id)}
                       aria-current={on ? "page" : undefined}
-                      className="row flex w-full items-center gap-2.5 px-2 py-[7px] text-left"
+                      /*
+                        Row metrics, in the order they were decided:
+                        36px tall so the touch target clears the 32px floor and
+                        the list still reads as dense; a 20px glyph at stroke
+                        1.5, which is the weight that stops an icon out-shouting
+                        the 14.5px label beside it; and 12px between them,
+                        because an icon is not a character and a word space is
+                        the wrong measure for the gap after one.
+                      */
+                      className="row flex h-9 w-full items-center gap-3 px-2.5 text-left"
                       data-active={on ? "true" : undefined}
                     >
                       <item.icon
-                        className="h-[17px] w-[17px] shrink-0"
-                        strokeWidth={1.75}
+                        className="size-5 shrink-0"
+                        strokeWidth={on ? 1.75 : 1.5}
                         style={{
-                          color: on ? "var(--ink-gray-9)" : "var(--ink-gray-4)",
+                          color: on ? "var(--ink-gray-9)" : "var(--ink-gray-5)",
                         }}
                         aria-hidden
                       />
                       <span
-                        className="min-w-0 flex-1 truncate text-[14.5px]"
+                        className="min-w-0 flex-1 truncate text-[14.5px] [transition:color_140ms_var(--e-out)]"
                         style={{
-                          color: on ? "var(--ink-gray-9)" : "var(--ink-gray-6)",
+                          color: on ? "var(--ink-gray-9)" : "var(--ink-gray-7)",
+                          fontWeight: on ? 500 : 400,
                         }}
                       >
                         {item.label}

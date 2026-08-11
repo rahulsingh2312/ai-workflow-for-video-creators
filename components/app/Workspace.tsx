@@ -9,18 +9,19 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
-  BarChart3,
   BookOpen,
+  ChartColumn,
   Check,
   ChevronDown,
   ChevronRight,
   ChevronUp,
   FileText,
+  Handshake,
+  History,
+  Inbox,
   House,
-  Lightbulb,
   Lock,
   LogOut,
   Menu,
@@ -30,7 +31,6 @@ import {
   Settings,
   Sparkles,
   Sun,
-  Target,
   Upload,
   X,
   Calendar,
@@ -44,6 +44,7 @@ import {
   Card,
   CardHeader,
   CheckRow,
+  CopyButton,
   Divider,
   Dot,
   EmptyState,
@@ -135,7 +136,9 @@ const NAV: {
     group: { en: "Work", zh: "工作" },
     items: [
       { id: "home", en: "Home", zh: "首页", icon: House },
-      { id: "topics", en: "Topics", zh: "选题", icon: Lightbulb },
+      /* An inbox of candidates waiting on your decision, not a lightbulb: the
+         product does not have ideas, it ranks them and asks you to choose. */
+      { id: "topics", en: "Topics", zh: "选题", icon: Inbox },
       { id: "task", en: "Script", zh: "脚本", icon: FileText },
       { id: "publish", en: "Publish", zh: "发布", icon: Send },
     ],
@@ -144,19 +147,22 @@ const NAV: {
     group: { en: "Inbox", zh: "收件" },
     items: [
       { id: "conversations", en: "Messages", zh: "消息", icon: MessageSquare },
-      { id: "leads", en: "Leads", zh: "线索", icon: Target },
+      /* A lead is a person who wants to talk, not a bullseye. */
+      { id: "leads", en: "Leads", zh: "线索", icon: Handshake },
     ],
   },
   {
     group: { en: "Insight", zh: "洞察" },
-    items: [{ id: "analytics", en: "Results", zh: "数据", icon: BarChart3 }],
+    items: [{ id: "analytics", en: "Results", zh: "数据", icon: ChartColumn }],
   },
   {
     group: { en: "Setup", zh: "设置" },
     items: [
       { id: "knowledge", en: "Knowledge", zh: "知识库", icon: BookOpen },
       { id: "settings", en: "Settings", zh: "配置", icon: Settings },
-      { id: "activity", en: "Activity", zh: "操作记录", icon: Activity },
+      /* This is the audit log. A heart-rate line says "live"; this is a
+         record of what already happened, and who did it. */
+      { id: "activity", en: "Activity", zh: "操作记录", icon: History },
     ],
   },
 ];
@@ -264,7 +270,16 @@ export function Workspace({ lang, session }: { lang: Lang; session: Session }) {
   const [config, setConfig] = useState<Row[]>([]);
   const [activity, setActivity] = useState<Row[]>([]);
   const [navOpen, setNavOpen] = useState(false);
-  const mainRef = useRef<HTMLElement>(null);
+
+  /* Escape closes the drawer. Anything that covers the screen has to. */
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
 
   const refresh = useCallback(
     async (target: Screen) => {
@@ -325,7 +340,19 @@ export function Workspace({ lang, session }: { lang: Lang; session: Session }) {
       setScreen(s);
       setError(null);
       setNavOpen(false);
-      mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      /*
+        <main> is a flex child with visible overflow, so it never scrolls and
+        this call was a no-op: switching from the bottom of Activity to Script
+        landed two-thirds of the way down the new screen. The window is the
+        scroller. `behavior: "smooth"` set from JS is not covered by the
+        reduced-motion stylesheet rule, so it is checked here.
+      */
+      window.scrollTo({
+        top: 0,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      });
     },
     [setError],
   );
@@ -433,16 +460,26 @@ export function Workspace({ lang, session }: { lang: Lang; session: Session }) {
         }
       />
 
-      {navOpen ? (
-        <button
-          type="button"
-          aria-label={t("Close menu", "关闭菜单")}
-          onClick={() => setNavOpen(false)}
-          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
-        />
-      ) : null}
+      {/*
+        Mounted always, so it can fade rather than appear. Hidden from the tab
+        order and the a11y tree when closed: Escape and the rail's own close
+        already cover the keyboard, and a full-screen button in the tab order
+        is a trap, not an affordance.
+      */}
+      <button
+        type="button"
+        aria-hidden={!navOpen}
+        tabIndex={-1}
+        aria-label={t("Close menu", "关闭菜单")}
+        onClick={() => setNavOpen(false)}
+        className={clsx(
+          "fixed inset-0 z-30 bg-black/50 lg:hidden",
+          "[transition:opacity_220ms_var(--e-out)]",
+          navOpen ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+      />
 
-      <main ref={mainRef} className="min-w-0 flex-1">
+      <main className="min-w-0 flex-1">
         <div
           className="flex items-center gap-3 px-4 py-3 lg:hidden"
           style={{ borderBottom: "1px solid var(--outline-gray-1)" }}
@@ -841,16 +878,31 @@ function HomeScreen({
         )}
       />
 
+      {/*
+        The one thing to do next, in the same grammar as the Script screen's
+        action bar: a near-neutral ground with a 3px rule down the leading edge
+        carrying the state. A 44px saturated disc made this the loudest object
+        on a screen whose job is to be scanned.
+      */}
       <div
-        className="mb-6 flex flex-wrap items-center gap-5 rounded-[var(--r)] p-6"
+        className="relative mb-6 flex flex-wrap items-center gap-5 overflow-hidden rounded-[var(--r)] py-5 pl-6 pr-5"
         style={{
-          background: "var(--surface-white)",
-          border: "1px solid var(--outline-gray-1)",
-          boxShadow: "var(--sh-md)",
+          background: "var(--surface-cards)",
+          boxShadow: "inset 0 0 0 1px var(--outline-gray-2)",
         }}
       >
         <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+          aria-hidden
+          className="absolute inset-y-0 left-0 w-[3px]"
+          style={{
+            background:
+              next.tone === "green"
+                ? "var(--ink-green-2)"
+                : "var(--ink-amber-2)",
+          }}
+        />
+        <span
+          className="flex size-8 shrink-0 items-center justify-center rounded-full"
           style={{
             background:
               next.tone === "green"
@@ -863,19 +915,19 @@ function HomeScreen({
           }}
         >
           {next.tone === "green" ? (
-            <Check className="h-5 w-5" />
+            <Check className="size-4" strokeWidth={2.25} />
           ) : (
-            <ArrowRight className="h-5 w-5" />
+            <ArrowRight className="size-4" strokeWidth={2.25} />
           )}
         </span>
         <div className="min-w-0 flex-1">
           <p
-            className="text-[12.5px] font-semibold uppercase tracking-wider"
+            className="text-[11.5px] font-medium uppercase tracking-[0.06em]"
             style={{ color: "var(--ink-gray-4)" }}
           >
             {t("Next", "下一步")}
           </p>
-          <h2 className="mt-1 text-[20px] font-semibold leading-tight">
+          <h2 className="mt-1.5 text-[19px] font-medium leading-tight tracking-[-0.015em]">
             {next.title}
           </h2>
           <p
@@ -945,6 +997,8 @@ function HomeScreen({
                   size="sm"
                   variant="ghost"
                   icon={ChevronRight}
+                  title={t("All activity", "全部操作记录")}
+                  ariaLabel={t("All activity", "全部操作记录")}
                   onClick={() => go("activity")}
                 />
               }
@@ -974,6 +1028,8 @@ function HomeScreen({
                   size="sm"
                   variant="ghost"
                   icon={ChevronRight}
+                  title={t("All leads", "全部线索")}
+                  ariaLabel={t("All leads", "全部线索")}
                   onClick={() => go("leads")}
                 />
               }
@@ -1007,6 +1063,13 @@ function HomeScreen({
   date, priority, who decided. The title track is the only flexible one, so it
   absorbs every width difference and nothing else drifts between rows.
 */
+/*
+  Seven tracks with a 560px hard minimum. Below that the title track is the
+  only flexible one, so it is the only one that can give — and it gave all the
+  way to zero. These are the same list with the least load-bearing columns
+  dropped, in the order a person would give them up: the tags first, then the
+  date and the decider, then the score.
+*/
 const TOPIC_COLUMNS = [
   "auto",
   "2.5rem",
@@ -1016,6 +1079,16 @@ const TOPIC_COLUMNS = [
   "5.5rem",
   "2rem",
 ];
+const TOPIC_COLUMNS_MD = [
+  "auto",
+  "2.5rem",
+  "minmax(0,1fr)",
+  "6.5rem",
+  "5.5rem",
+  "2rem",
+];
+const TOPIC_COLUMNS_SM = ["auto", "2.5rem", "minmax(0,1fr)", "5.5rem"];
+const TOPIC_COLUMNS_XS = ["auto", "minmax(0,1fr)", "5.5rem"];
 
 function Topics({
   lang,
@@ -1131,7 +1204,7 @@ function Topics({
       <div className="pt-4">
         {!groups.length ? (
           <div className="flex flex-col items-center gap-1 py-16 text-center">
-            <Lightbulb
+            <Inbox
               className="size-6"
               strokeWidth={1.5}
               style={{ color: "var(--ink-gray-4)" }}
@@ -1164,7 +1237,13 @@ function Topics({
                   }
                 />
                 {open ? (
-                  <List columns={TOPIC_COLUMNS} className="mt-1">
+                  <List
+                    columns={TOPIC_COLUMNS}
+                    columnsMd={TOPIC_COLUMNS_MD}
+                    columnsSm={TOPIC_COLUMNS_SM}
+                    columnsXs={TOPIC_COLUMNS_XS}
+                    className="mt-1"
+                  >
                     {g.rows.map((c) => {
                       const mine = sourcesFor(c.id);
                       const myRisks = risksFor(c.id);
@@ -1186,7 +1265,7 @@ function Topics({
                                 }
                               />
                             </ListCell>
-                            <ListCell>
+                            <ListCell col="rank">
                               <span
                                 className="text-[13px] tabular-nums"
                                 style={{ color: "var(--ink-gray-4)" }}
@@ -1194,7 +1273,7 @@ function Topics({
                                 {c.score}
                               </span>
                             </ListCell>
-                            <ListCell>
+                            <ListCell col="title">
                               <span
                                 className="truncate text-[14px] font-medium"
                                 style={{ color: "var(--ink-gray-8)" }}
@@ -1202,7 +1281,10 @@ function Topics({
                                 {zh ? c.title_zh : c.title_en}
                               </span>
                             </ListCell>
-                            <ListCell className="gap-1.5 overflow-hidden">
+                            <ListCell
+                              col="tags"
+                              className="gap-1.5 overflow-hidden"
+                            >
                               <Tag
                                 label={`${mine.length} ${t("sources", "来源")}`}
                                 dot={DOT.gray}
@@ -1227,7 +1309,7 @@ function Topics({
                                 </span>
                               ) : null}
                             </ListCell>
-                            <ListCell>
+                            <ListCell col="date">
                               {mine[0]?.published_at ? (
                                 <span
                                   className="flex items-center whitespace-nowrap text-[13px]"
@@ -1238,10 +1320,10 @@ function Topics({
                                 </span>
                               ) : null}
                             </ListCell>
-                            <ListCell>
+                            <ListCell col="priority">
                               <Priority level={lv} label={levelLabel[lv]} />
                             </ListCell>
-                            <ListCell className="justify-end">
+                            <ListCell col="who" className="justify-end">
                               {c.decided_by_name ? (
                                 <Avatar name={String(c.decided_by_name)} />
                               ) : null}
@@ -2075,6 +2157,193 @@ function Task({
   );
 }
 
+/**
+ * One platform's package.
+ *
+ * Everything here exists to be moved into somebody else's app by hand, so the
+ * three blocks that hold text each carry their own copy control and nothing
+ * relies on the operator dragging a selection across a paragraph.
+ *
+ * The titles are a choice, not a list, so they behave like one: a radio group
+ * with a visible selection, and the copy control follows the selection rather
+ * than sitting on every row. The checklist is real state, because an operator
+ * ticking items off in another window needs somewhere to keep count.
+ */
+function PackageBody({
+  lang,
+  id,
+  titles,
+  caption,
+  tags,
+  checklist,
+}: {
+  lang: Lang;
+  id: string;
+  titles: string[];
+  caption: string;
+  tags: string[];
+  checklist: string[];
+}) {
+  const zh = lang === "zh";
+  const t = (en: string, z: string) => (zh ? z : en);
+  const [picked, setPicked] = useState(0);
+  const [ticked, setTicked] = useState<Set<number>>(new Set());
+  const tagLine = tags.map((x) => (x.startsWith("#") ? x : `#${x}`)).join(" ");
+
+  return (
+    <>
+      <Section
+        label={t("Pick a title", "挑个标题")}
+        action={
+          <CopyButton
+            value={titles[picked] ?? ""}
+            label={t("Copy", "复制")}
+            copiedLabel={t("Copied", "已复制")}
+          />
+        }
+      >
+        <div
+          role="radiogroup"
+          aria-label={t("Title options", "标题选项")}
+          className="space-y-1.5"
+        >
+          {titles.map((x, i) => {
+            const on = i === picked;
+            return (
+              <button
+                key={i}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setPicked(i)}
+                className={clsx(
+                  "flex w-full items-start gap-2.5 rounded-[var(--r-sm)] px-3 py-2 text-left text-[14px]",
+                  "[transition:background-color_140ms_var(--e-out),box-shadow_140ms_var(--e-out)]",
+                  !on && "hov:bg-[var(--surface-gray-2)]",
+                )}
+                style={{
+                  background: on ? "var(--surface-gray-2)" : "transparent",
+                  boxShadow: on
+                    ? "inset 0 0 0 1px var(--outline-gray-3)"
+                    : "inset 0 0 0 1px var(--outline-gray-1)",
+                }}
+              >
+                <span
+                  aria-hidden
+                  className="mt-[3px] flex size-3.5 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    boxShadow: `inset 0 0 0 ${on ? "4px" : "1.5px"} ${
+                      on ? "var(--ink-gray-9)" : "var(--outline-gray-3)"
+                    }`,
+                  }}
+                />
+                <span className="min-w-0 flex-1">{x}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section
+        label={t("Caption", "正文")}
+        action={
+          <CopyButton
+            value={caption}
+            label={t("Copy", "复制")}
+            copiedLabel={t("Copied", "已复制")}
+          />
+        }
+      >
+        <p
+          className="rounded-[var(--r-sm)] px-3 py-2.5 text-[14px] leading-relaxed"
+          style={{ background: "var(--surface-gray-1)" }}
+        >
+          {caption}
+        </p>
+      </Section>
+
+      <Section
+        label={t("Tags", "标签")}
+        action={
+          <CopyButton
+            value={tagLine}
+            label={t("Copy all", "全部复制")}
+            copiedLabel={t("Copied", "已复制")}
+          />
+        }
+      >
+        <div className="flex flex-wrap gap-1.5">
+          {tags.map((x) => (
+            <Badge key={x}>{x}</Badge>
+          ))}
+        </div>
+      </Section>
+
+      <Section
+        label={t("Before you post", "发之前检查")}
+        action={
+          <Meta>
+            {ticked.size}/{checklist.length}
+          </Meta>
+        }
+      >
+        <ul className="space-y-0.5">
+          {checklist.map((x, i) => {
+            const on = ticked.has(i);
+            return (
+              <li key={i}>
+                <label
+                  className="flex cursor-pointer items-start gap-2.5 rounded-[var(--r-sm)] px-1.5 py-1.5 [transition:background-color_140ms_var(--e-out)] hov:bg-[var(--surface-gray-1)]"
+                  htmlFor={`${id}-c${i}`}
+                >
+                  <input
+                    id={`${id}-c${i}`}
+                    type="checkbox"
+                    checked={on}
+                    onChange={() =>
+                      setTicked((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(i)) next.delete(i);
+                        else next.add(i);
+                        return next;
+                      })
+                    }
+                    className="sr-only"
+                  />
+                  <span
+                    aria-hidden
+                    className="mt-[2px] flex size-4 shrink-0 items-center justify-center rounded-[4px] [transition:background-color_140ms_var(--e-out),box-shadow_140ms_var(--e-out)]"
+                    style={{
+                      background: on ? "var(--surface-gray-7)" : "transparent",
+                      boxShadow: on
+                        ? "none"
+                        : "inset 0 0 0 1.5px var(--outline-gray-3)",
+                      color: "var(--ink-white)",
+                    }}
+                  >
+                    {on ? (
+                      <Check className="size-2.5" strokeWidth={3.5} />
+                    ) : null}
+                  </span>
+                  <span
+                    className="min-w-0 flex-1 text-[13.5px] leading-normal [transition:color_140ms_var(--e-out)]"
+                    style={{
+                      color: on ? "var(--ink-gray-4)" : "var(--ink-gray-8)",
+                      textDecoration: on ? "line-through" : undefined,
+                    }}
+                  >
+                    {x}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      </Section>
+    </>
+  );
+}
+
 const PLATFORM_NAME: Record<string, { en: string; zh: string }> = {
   channels: { en: "WeChat Channels", zh: "视频号" },
   douyin: { en: "Douyin", zh: "抖音" },
@@ -2083,19 +2352,24 @@ const PLATFORM_NAME: Record<string, { en: string; zh: string }> = {
 
 function Section({
   label,
+  action,
   children,
 }: {
   label: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-4">
-      <p
-        className="mb-1.5 text-[12.5px] font-semibold uppercase tracking-wide"
-        style={{ color: "var(--ink-gray-4)" }}
-      >
-        {label}
-      </p>
+    <div className="mb-5">
+      <div className="mb-2 flex min-h-7 items-center justify-between gap-3">
+        <p
+          className="text-[11.5px] font-medium uppercase tracking-[0.06em]"
+          style={{ color: "var(--ink-gray-4)" }}
+        >
+          {label}
+        </p>
+        {action}
+      </div>
       {children}
     </div>
   );
@@ -2261,7 +2535,7 @@ function Publish({
                       {t("Posted", "已发布")}
                     </Badge>
                   ) : (
-                    <Badge tone="amber">{t("Ready", "待发布")}</Badge>
+                    <Badge tone="gray">{t("Ready to post", "待发布")}</Badge>
                   )
                 }
               />
@@ -2277,43 +2551,14 @@ function Publish({
                 </p>
               ) : (
                 <>
-                  <Section label={t("Pick a title", "挑个标题")}>
-                    <ul className="space-y-1.5">
-                      {payload.titles.map((x: string, i: number) => (
-                        <li
-                          key={i}
-                          className="rounded-[var(--r-sm)] px-3 py-2 text-[14px]"
-                          style={{ background: "var(--surface-gray-2)" }}
-                        >
-                          {x}
-                        </li>
-                      ))}
-                    </ul>
-                  </Section>
-                  <Section label={t("Caption", "正文")}>
-                    <p
-                      className="rounded-[var(--r-sm)] px-3 py-2 text-[14px] leading-relaxed"
-                      style={{ background: "var(--surface-gray-2)" }}
-                    >
-                      {payload.caption}
-                    </p>
-                  </Section>
-                  <Section label={t("Tags", "标签")}>
-                    <div className="flex flex-wrap gap-1.5">
-                      {payload.tags.map((x: string) => (
-                        <Badge key={x}>{x}</Badge>
-                      ))}
-                    </div>
-                  </Section>
-                  <Section label={t("Before you post", "发之前检查")}>
-                    <ul>
-                      {payload.checklist.map((x: string, i: number) => (
-                        <CheckRow key={i} done={false}>
-                          {x}
-                        </CheckRow>
-                      ))}
-                    </ul>
-                  </Section>
+                  <PackageBody
+                    lang={lang}
+                    id={p.id}
+                    titles={payload.titles as string[]}
+                    caption={payload.caption as string}
+                    tags={payload.tags as string[]}
+                    checklist={payload.checklist as string[]}
+                  />
 
                   <Divider />
                   {published ? (
@@ -2326,7 +2571,24 @@ function Publish({
                       {p.live_url}
                     </p>
                   ) : (
+                    /*
+                      The one thing this product will not do for you, framed as
+                      what it actually is: a record of something a person did
+                      somewhere else. "Save it" said nothing about what was
+                      being saved or why it mattered.
+                    */
                     <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <p
+                          className="t-sm"
+                          style={{ color: "var(--ink-gray-6)" }}
+                        >
+                          {t(
+                            "Once you have posted it, record where it went. The link is what ties the metrics back to this script version.",
+                            "发完之后，把它登记回来。这条链接就是把数据接回这一版脚本的凭据。",
+                          )}
+                        </p>
+                      </div>
                       <Field
                         label={t(
                           "Which account did you post from?",
@@ -2370,7 +2632,7 @@ function Publish({
                             })
                           }
                         >
-                          {t("Save it", "保存")}
+                          {t("Record the publication", "登记这次发布")}
                         </Button>
                       </div>
                     </div>
@@ -2542,7 +2804,7 @@ function Leads({ lang, rows, act }: { lang: Lang; rows: Row[]; act: ActFn }) {
       />
       {!rows.length ? (
         <EmptyState
-          icon={Target}
+          icon={Handshake}
           title={t("No leads yet", "还没有线索")}
           body={t(
             "Send a message about a partnership in Messages and one shows up here.",
@@ -2699,11 +2961,18 @@ function Results({
                 >
                   {METRIC_LABEL[k]?.[lang] ?? k}
                 </p>
-                <p className="mt-1.5 text-[22px] font-semibold leading-none">
+                <p className="mt-1.5 text-[22px] font-medium leading-none tracking-[-0.02em] tabular-nums">
                   {v == null ? (
+                    /*
+                      A metric the platform would not hand over is missing, not
+                      broken. This used to be set in red, which is the colour
+                      this product uses for "stopped" — four red tiles made a
+                      healthy report look like an incident. Grey says absent,
+                      and the note underneath the grid says why.
+                    */
                     <span
                       className="text-[15px]"
-                      style={{ color: "var(--ink-red-4)" }}
+                      style={{ color: "var(--ink-gray-4)" }}
                     >
                       {t("not available", "拿不到")}
                     </span>
