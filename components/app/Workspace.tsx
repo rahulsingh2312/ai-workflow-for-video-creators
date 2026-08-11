@@ -2787,14 +2787,34 @@ function Publish({
 
                   <Divider />
                   {published ? (
-                    <p
-                      className="text-[13.5px]"
-                      style={{ color: "var(--ink-gray-6)" }}
-                    >
-                      {p.account} ·{" "}
-                      {String(p.published_at).slice(0, 16).replace("T", " ")} ·{" "}
-                      {p.live_url}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p
+                        className="min-w-0 flex-1 text-[13.5px]"
+                        style={{ color: "var(--ink-gray-6)" }}
+                      >
+                        {p.account} ·{" "}
+                        {String(p.published_at).slice(0, 16).replace("T", " ")}{" "}
+                        · {p.live_url}
+                      </p>
+                      {/*
+                        The loop closing on itself. Discovery said an audience
+                        was asking this; this reads back how the answer did and
+                        who turned up underneath it.
+                      */}
+                      <Button
+                        size="sm"
+                        icon={History}
+                        loading={busy}
+                        onClick={() =>
+                          act(`packages/${p.id}/readback`, {
+                            method: "POST",
+                            body: "{}",
+                          })
+                        }
+                      >
+                        {t("Read the results", "读回数据")}
+                      </Button>
+                    </div>
                   ) : (
                     /*
                       The one thing this product will not do for you, framed as
@@ -3055,7 +3075,25 @@ function Leads({ lang, rows, act }: { lang: Lang; rows: Row[]; act: ActFn }) {
                 {l.score}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[15.5px] font-semibold">{l.contact}</p>
+                <p className="flex flex-wrap items-center gap-2 text-[15.5px] font-semibold">
+                  {l.contact}
+                  {/*
+                    Both doors lead to the same inbox and the same score, so the
+                    origin is a quiet label rather than a second column: it
+                    changes how you open the conversation, not how you rank it.
+                  */}
+                  <span
+                    className="rounded-[4px] px-1.5 py-[1px] text-[11px] font-normal"
+                    style={{
+                      boxShadow: "inset 0 0 0 1px var(--outline-gray-2)",
+                      color: "var(--ink-gray-5)",
+                    }}
+                  >
+                    {l.origin === "comment"
+                      ? t("comment", "评论")
+                      : t("chat", "会话")}
+                  </span>
+                </p>
                 <p
                   className="mt-0.5 text-[13.5px]"
                   style={{ color: "var(--ink-gray-6)" }}

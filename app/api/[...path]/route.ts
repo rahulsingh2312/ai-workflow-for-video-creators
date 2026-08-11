@@ -26,6 +26,7 @@ import {
   generatePackages,
   generateScript,
   personaReply,
+  readPublished,
   runTopicAgent,
   buildClaimMap,
 } from "@/lib/server/agents";
@@ -781,6 +782,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       /* ── Publish record ─────────────────────────────────────────────── */
       case "packages": {
         await requireRole("publisher", "admin");
+        /* Read the published video back: performance, and anyone asking
+           something in the comments. */
+        if (action === "readback") {
+          const result = await readPublished(s, a);
+          return ok({ result, detail: taskDetail(s, String(result.task_id)) });
+        }
         if (action !== "record") break;
         const url = String(input.live_url ?? "").trim();
         const account = String(input.account ?? "").trim();

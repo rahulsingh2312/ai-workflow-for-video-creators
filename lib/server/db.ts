@@ -40,14 +40,21 @@ export function db(): DatabaseSync {
   TABLE IF NOT EXISTS will not add them, so they are applied by hand.
 */
 function migrate(conn: DatabaseSync) {
-  const cols = conn.prepare("PRAGMA table_info(source)").all() as {
-    name: string;
-  }[];
-  if (!cols.some((c) => c.name === "keywords")) {
-    conn.exec(
-      "ALTER TABLE source ADD COLUMN keywords TEXT NOT NULL DEFAULT '[]'",
-    );
-  }
+  const add = (table: string, column: string, ddl: string) => {
+    const cols = conn.prepare(`PRAGMA table_info(${table})`).all() as {
+      name: string;
+    }[];
+    if (!cols.some((c) => c.name === column)) {
+      conn.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+    }
+  };
+  add("source", "keywords", "keywords TEXT NOT NULL DEFAULT '[]'");
+  // No CHECK on these: SQLite cannot add a constrained column to a table that
+  // already exists. The constraint lives in schema.sql for fresh databases, and
+  // the only writers are the two agents in agents.ts.
+  add("lead", "origin", "origin TEXT NOT NULL DEFAULT 'wechat_chat'");
+  add("lead", "external_ref", "external_ref TEXT");
+  add("lead", "package_id", "package_id TEXT");
 }
 
 export const now = () => new Date().toISOString();

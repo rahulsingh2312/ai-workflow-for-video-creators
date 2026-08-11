@@ -5,11 +5,15 @@ import { HttpError } from "@/lib/server/auth";
 import {
   complete,
   discoveryProvider,
+  fetchComments,
+  fetchVideoStats,
   fetchVirals,
+  readbackFor,
   retrieve,
   runAgent,
   velocityOf,
   type AgentResult,
+  type VideoStats,
 } from "@/lib/server/gateway";
 import { invalidatePackages } from "@/lib/server/interlocking";
 
@@ -151,7 +155,12 @@ export async function generateScript(
           `目标字数：${minChars} 到 ${maxChars} 个汉字。\n` +
           (note ? `本次要求：${note}\n` : ""),
         maxTokens: 3000,
-        fallback: localDraft(task.title_zh, sources, minChars),
+        fallback: localDraft(
+          task.title_zh,
+          sources,
+          minChars,
+          models[0]?.title,
+        ),
       });
 
       const body = draft.text.trim();
@@ -220,6 +229,7 @@ export async function generateScript(
           label,
           chars,
           style_checks: styleChecks,
+          modelled_on: models.map((m) => m.title),
         },
         source_refs: sources.map((s) => s.id),
         confidence: styleChecks.length ? 0.68 : 0.86,
@@ -243,12 +253,17 @@ function localDraft(
   title: string,
   sources: { id: string; label_zh: string; published_at: string }[],
   minChars: number,
+  /** The video that pulled the audience here, named in the opening only. */
+  modelledOn?: string,
 ): string {
   const s = (i: number) =>
     sources[i % Math.max(sources.length, 1)]?.id ?? "unsourced";
 
   const sections = [
-    `【问题开场】\n先问一个问题：${title}，这件事现在到底定了没有？这几天我看到不少解读，` +
+    `【问题开场】\n先问一个问题：${title}，这件事现在到底定了没有？` +
+      (modelledOn
+        ? `这几天《${modelledOn}》这类视频转得很广，`
+        : `这几天我看到不少解读，`) +
       `标题都写着已经落地，可你要是把原文翻到最后一页，会发现它现在还只是一份征求意见稿。[${s(0)}]`,
 
     `【清楚的类比】\n你可以把它想成一栋还搭着脚手架的楼。外形你已经看得见，户型图也贴出来了，` +
@@ -938,6 +953,185 @@ export async function personaReply(
             ? [{ level: "CRITICAL", note: refuse[1] }]
             : [],
         human_action_required: mode !== "AUTO",
+      };
+    },
+  );
+}
+
+/* ── Published-video readback ────────────────────────────────────────────── */
+
+/**
+ * Read a published video back: how it did, and who is asking something in the
+ * comments.
+ *
+ * This closes the loop the workflow opens. Discovery said an audience was
+ * asking a question, the script answered it from approved sources, and this is
+ * where the answer's own audience shows up.
+ *
+ * When no connector can read the URL the run is blocked rather than completed,
+ * and the fields it could not collect are named. Performance data is the real
+ * business result, so the one thing this must never do is fill a gap with a
+ * plausible number.
+ */
+export async function readPublished(session: Session, packageId: string) {
+  const pkg = one<{
+    id: string;
+    task_id: string;
+    platform: string;
+    account: string | null;
+    live_url: string | null;
+    published_at: string | null;
+    status: string;
+  }>(
+    "SELECT id,task_id,platform,account,live_url,published_at,status FROM publish_package WHERE id = ? AND workspace_id = ?",
+    packageId,
+    session.workspaceId,
+  );
+  if (!pkg) throw new HttpError(404, "no_package", "No such package.");
+  if (pkg.status !== "published" || !pkg.live_url) {
+    throw new HttpError(
+      409,
+      "not_published",
+      "Record where it went live before reading it back.",
+    );
+  }
+  const liveUrl = pkg.live_url;
+
+  return runAgent<{
+    connector: string;
+    metrics: VideoStats | null;
+    comments_read: number;
+    leads: number;
+    missing: string[];
+  }>(
+    {
+      workspaceId: session.workspaceId,
+      taskId: pkg.task_id,
+      agent: "results",
+      promptVersion: "results.readback.v1",
+    },
+    async () => {
+      const connector = readbackFor(liveUrl);
+      if (connector === "none") {
+        const missing = ["views", "likes", "comments"];
+        return {
+          status: "blocked" as const,
+          payload: {
+            connector,
+            metrics: null,
+            comments_read: 0,
+            leads: 0,
+            missing,
+          },
+          source_refs: [pkg.id],
+          confidence: null,
+          risk_flags: [
+            {
+              level: "LOW",
+              note: `No connector can read ${new URL(liveUrl).host} back. Import these by hand: ${missing.join(", ")}.`,
+            },
+          ],
+          human_action_required: true,
+        };
+      }
+
+      const stats = await fetchVideoStats(liveUrl);
+      const comments = await fetchComments(liveUrl);
+      const t = now();
+      const day = t.slice(0, 10);
+
+      if (stats) {
+        // Re-reading the same video on the same day is an update, not a second
+        // import. The unique import key is what makes the run retry-safe.
+        run(
+          `INSERT INTO metric_snapshot
+           (id,workspace_id,task_id,platform,account,collection_method,period_start,period_end,metrics,missing_fields,import_key,created_at,updated_at,created_by)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+           ON CONFLICT(import_key) DO UPDATE SET
+             metrics=excluded.metrics,updated_at=excluded.updated_at,revision=metric_snapshot.revision+1`,
+          id("m"),
+          session.workspaceId,
+          pkg.task_id,
+          pkg.platform,
+          pkg.account ?? "unspecified",
+          "api",
+          (pkg.published_at ?? t).slice(0, 10),
+          day,
+          JSON.stringify(stats),
+          "[]",
+          `${pkg.platform}:${day}:api:${pkg.id}`,
+          t,
+          t,
+          "agent:results",
+        );
+        audit(session, "import", "publish_package", pkg.id, null, {
+          via: connector,
+          ...stats,
+        });
+      }
+
+      /* Comments are read with the same intent rules the persona uses, so a
+         question asked under a video and the same question asked in a chat
+         score identically and land in one inbox. */
+      let made = 0;
+      for (const c of comments) {
+        const intent = INTENTS.find(([re]) => re.test(c.text));
+        if (!intent) continue;
+        const [, name, score] = intent;
+        const seen = one<{ id: string }>(
+          "SELECT id FROM lead WHERE workspace_id = ? AND external_ref = ?",
+          session.workspaceId,
+          c.externalId,
+        );
+        if (seen) continue;
+        const open = one<{ id: string }>(
+          "SELECT id FROM lead WHERE workspace_id = ? AND contact = ? AND intent = ? AND status NOT IN ('closed','rejected')",
+          session.workspaceId,
+          c.author,
+          name,
+        );
+        if (open) continue;
+
+        const leadId = id("l");
+        run(
+          `INSERT INTO lead (id,workspace_id,origin,external_ref,package_id,contact,intent,score,status,notified_at,created_at,updated_at,created_by)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          leadId,
+          session.workspaceId,
+          "comment",
+          c.externalId,
+          pkg.id,
+          c.author,
+          name,
+          score,
+          "new",
+          t,
+          t,
+          t,
+          "agent:leads",
+        );
+        audit(session, "lead_created", "lead", leadId, null, {
+          intent: name,
+          score,
+          origin: "comment",
+          from: pkg.id,
+        });
+        made++;
+      }
+
+      return {
+        status: made ? ("needs_review" as const) : ("completed" as const),
+        payload: {
+          connector,
+          metrics: stats,
+          comments_read: comments.length,
+          leads: made,
+          missing: stats ? [] : ["views", "likes", "comments"],
+        },
+        source_refs: [pkg.id],
+        confidence: 0.9,
+        risk_flags: [],
+        human_action_required: made > 0,
       };
     },
   );

@@ -334,6 +334,14 @@ CREATE TABLE IF NOT EXISTS lead (
   id              TEXT PRIMARY KEY,
   workspace_id    TEXT NOT NULL REFERENCES workspace(id),
   conversation_id TEXT REFERENCES conversation(id),
+  -- Where the person surfaced. Both origins score the same way and land in the
+  -- same inbox; this only records which door they came through.
+  origin          TEXT NOT NULL DEFAULT 'wechat_chat'
+                    CHECK (origin IN ('wechat_chat','comment')),
+  -- The platform's own id for the comment, so a re-read of the same video does
+  -- not raise the same person twice.
+  external_ref    TEXT,
+  package_id      TEXT REFERENCES publish_package(id),
   contact         TEXT NOT NULL,
   contact_ref     TEXT,
   intent          TEXT NOT NULL,

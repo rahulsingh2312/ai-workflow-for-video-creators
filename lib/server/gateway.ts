@@ -359,6 +359,10 @@ type YtVideoItem = {
   };
 };
 
+/** Overridable so the readback path can be exercised without calling Google. */
+const YT_BASE =
+  process.env.YOUTUBE_API_BASE ?? "https://www.googleapis.com/youtube/v3";
+
 async function ytJson<T>(
   path: string,
   params: Record<string, string>,
@@ -367,9 +371,7 @@ async function ytJson<T>(
     ...params,
     key: process.env.YOUTUBE_API_KEY!,
   });
-  const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/${path}?${qs}`,
-  );
+  const res = await fetch(`${YT_BASE}/${path}?${qs}`);
   if (!res.ok) {
     throw new Error(
       `youtube ${path} ${res.status}: ${(await res.text()).slice(0, 300)}`,
@@ -448,6 +450,110 @@ export async function fetchVirals(opts: {
       (x) => x.platform === "wechat_channels" && wanted.has(x.keyword),
     ),
   );
+  return out;
+}
+
+/* ── Published-video readback ────────────────────────────────────────────────
+   What happened after the creator posted it.
+
+   Nothing here invents a number. Performance data is the actual business
+   result, so a missing connector reports itself as missing and the caller
+   records that, rather than filling the gap with something plausible. This is
+   the one place where the deterministic local provider deliberately returns
+   nothing instead of a stand-in.
+   -------------------------------------------------------------------------- */
+
+export type VideoStats = { views: number; likes: number; comments: number };
+export type VideoComment = {
+  externalId: string;
+  author: string;
+  text: string;
+  publishedAt: string;
+};
+
+/** The id inside a watch URL, short link, or embed. Null when it is not YouTube. */
+export function youtubeIdFrom(url: string): string | null {
+  const m =
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/.exec(
+      url,
+    );
+  return m ? m[1] : null;
+}
+
+/** Which connector, if any, can read a given published URL back. */
+export function readbackFor(url: string): "youtube" | "none" {
+  return youtubeIdFrom(url) && process.env.YOUTUBE_API_KEY ? "youtube" : "none";
+}
+
+export async function fetchVideoStats(url: string): Promise<VideoStats | null> {
+  const videoId = youtubeIdFrom(url);
+  if (!videoId || readbackFor(url) !== "youtube") return null;
+  const data = await ytJson<{ items?: YtVideoItem[] }>("videos", {
+    part: "statistics",
+    id: videoId,
+  });
+  const s = data.items?.[0]?.statistics;
+  if (!s) return null;
+  return {
+    views: Number(s.viewCount ?? 0),
+    likes: Number(s.likeCount ?? 0),
+    comments: Number(s.commentCount ?? 0),
+  };
+}
+
+type YtCommentThread = {
+  snippet?: {
+    topLevelComment?: {
+      id?: string;
+      snippet?: {
+        authorDisplayName?: string;
+        textOriginal?: string;
+        publishedAt?: string;
+      };
+    };
+  };
+};
+
+/**
+ * Top-level comments on a published video.
+ *
+ * Ordered by relevance rather than time: lead detection wants the comments a
+ * person would actually have replied to, and the newest hundred on a video
+ * that did well are mostly reactions.
+ */
+export async function fetchComments(
+  url: string,
+  max = 100,
+): Promise<VideoComment[]> {
+  const videoId = youtubeIdFrom(url);
+  if (!videoId || readbackFor(url) !== "youtube") return [];
+  const out: VideoComment[] = [];
+  let pageToken: string | undefined;
+  while (out.length < max) {
+    const page = await ytJson<{
+      items?: YtCommentThread[];
+      nextPageToken?: string;
+    }>("commentThreads", {
+      part: "snippet",
+      videoId,
+      order: "relevance",
+      maxResults: String(Math.min(100, max - out.length)),
+      ...(pageToken ? { pageToken } : {}),
+    });
+    for (const item of page.items ?? []) {
+      const c = item.snippet?.topLevelComment;
+      const s = c?.snippet;
+      if (!c?.id || !s?.textOriginal) continue;
+      out.push({
+        externalId: c.id,
+        author: s.authorDisplayName ?? "(unknown)",
+        text: s.textOriginal,
+        publishedAt: (s.publishedAt ?? "").slice(0, 10),
+      });
+    }
+    if (!page.nextPageToken) break;
+    pageToken = page.nextPageToken;
+  }
   return out;
 }
 
