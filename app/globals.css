@@ -193,11 +193,13 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /*
-    Deliberately no `text-rendering: optimizeLegibility` and no
-    character-variant overrides. The first opens gaps around individual
-    letters in Chromium at display sizes; the second was inherited from a
-    stack set in Inter, whose feature names mean nothing to Geist. Together
-    they were rendering the wordmark as "Thro ughline".
+    Deliberately no `font-feature-settings` here. The stack this replaced was
+    set in Inter and asked for "cv05" and "cv08"; Geist has no such features,
+    so the declaration was doing nothing but inviting a future reader to
+    believe it was. `text-rendering: optimizeLegibility` is left off for the
+    same reason: Chromium already applies kerning and default ligatures, and
+    the property's only other effect here would be to change how it breaks
+    under memory pressure.
   */
 }
 

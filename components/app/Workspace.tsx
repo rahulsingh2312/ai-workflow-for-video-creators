@@ -15,7 +15,9 @@ import {
   BarChart3,
   BookOpen,
   Check,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   FileText,
   House,
   Lightbulb,
@@ -70,6 +72,7 @@ import {
   CHIP_COLORS,
   PrimaryAction,
 } from "@/components/app/Shell";
+import { ScriptReader, type SourceRow } from "@/components/app/ScriptReader";
 import {
   Avatar,
   CellIcon,
@@ -158,6 +161,44 @@ const NAV: {
   },
 ];
 
+/*
+  Which task the workspace opens on.
+
+  It used to be whichever one the list handed back first, which is an ordering
+  decision made by a SQL query for its own reasons. With more than one task in
+  flight that meant landing on an arbitrary one, and it made Publish lie: the
+  screen would say "not ready yet" while a different task sat there with its
+  package generated and waiting to be recorded.
+
+  So: the furthest-along task wins, and among equals the one touched most
+  recently. That is the one the person almost certainly came back for.
+*/
+const STATE_ORDER = [
+  "NEW",
+  "TOPIC_REVIEW",
+  "TOPIC_SELECTED",
+  "SCRIPT_DRAFT",
+  "FACT_REVIEW",
+  "SCRIPT_LOCKED",
+  "PRODUCTION",
+  "VIDEO_READY",
+  "PUBLISH_PACKAGE_READY",
+  "PUBLISHED_MANUALLY",
+  "ANALYZED",
+];
+
+function pickTask<
+  T extends { id: string; state?: string; updated_at?: string },
+>(tasks: T[]): T {
+  return [...tasks].sort((a, b) => {
+    const d =
+      STATE_ORDER.indexOf(String(b.state)) -
+      STATE_ORDER.indexOf(String(a.state));
+    if (d !== 0) return d;
+    return String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? ""));
+  })[0];
+}
+
 /* ── Data ────────────────────────────────────────────────────────────────── */
 
 function useApi(lang: Lang) {
@@ -230,9 +271,10 @@ export function Workspace({ lang, session }: { lang: Lang; session: Session }) {
       const list = await call("tasks");
       if (list) {
         setTasks(list.tasks);
-        if (!taskId && list.tasks.length) setTaskId(list.tasks[0].id);
+        if (!taskId && list.tasks.length) setTaskId(pickTask(list.tasks).id);
       }
-      const active = taskId ?? list?.tasks?.[0]?.id;
+      const active =
+        taskId ?? (list?.tasks?.length ? pickTask(list.tasks).id : undefined);
       if (active) {
         const d = await call(`tasks/${active}`);
         if (d) setDetail(d);
@@ -423,7 +465,7 @@ export function Workspace({ lang, session }: { lang: Lang; session: Session }) {
 
         {error ? (
           <div
-            className="app-rise mx-6 mt-5 flex items-start gap-2.5 rounded-[var(--r)] px-3.5 py-3"
+            className="app-rise mx-4 mt-5 flex items-start gap-2.5 rounded-[var(--r)] px-3.5 py-3 sm:mx-6"
             style={{ background: "var(--surface-red-2)" }}
           >
             <AlertTriangle
@@ -454,7 +496,14 @@ export function Workspace({ lang, session }: { lang: Lang; session: Session }) {
           </div>
         ) : null}
 
-        <div className="app-rise pb-16" key={screen}>
+        {/*
+          The screen wrapper owns the gutters, so every screen gets the same
+          ones. They used to be applied per screen, which meant Home had none:
+          on desktop its title sat flush against the rail, and on mobile, where
+          there is no rail to hide behind, the first character was clipped by
+          the viewport edge.
+        */}
+        <div className="app-rise px-4 pb-16 pt-6 sm:px-6" key={screen}>
           {screen === "home" && (
             <HomeScreen
               lang={lang}
@@ -484,7 +533,15 @@ export function Workspace({ lang, session }: { lang: Lang; session: Session }) {
             />
           )}
           {screen === "publish" && (
-            <Publish lang={lang} detail={detail} act={act} busy={busy} />
+            <Publish
+              lang={lang}
+              detail={detail}
+              act={act}
+              busy={busy}
+              tasks={tasks}
+              taskId={taskId}
+              setTaskId={setTaskId}
+            />
           )}
           {screen === "conversations" && (
             <Messages lang={lang} rows={conversations} act={act} busy={busy} />
@@ -1021,7 +1078,7 @@ function Topics({
 
   return (
     <>
-      <div className="flex items-center gap-3 px-6 pt-5">
+      <div className="flex items-center gap-3">
         <h1
           className="min-w-0 flex-1 truncate text-[16px] font-medium"
           style={{ color: "var(--ink-gray-8)" }}
@@ -1037,7 +1094,7 @@ function Topics({
         </PrimaryAction>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 px-6 pt-5">
+      <div className="mt-5 flex flex-wrap items-center gap-2">
         <div
           className="flex items-center rounded-[var(--r-sm)] p-[3px]"
           style={{ background: "var(--rail)" }}
@@ -1071,7 +1128,7 @@ function Topics({
         </span>
       </div>
 
-      <div className="px-6 pb-10 pt-4">
+      <div className="pt-4">
         {!groups.length ? (
           <div className="flex flex-col items-center gap-1 py-16 text-center">
             <Lightbulb
@@ -1375,28 +1432,50 @@ function ActionBar({
     (c) => c.key === "producer" && !c.proved,
   );
 
+  /*
+    The one thing to do next.
+
+    This used to be a fully saturated amber or green slab across the top of the
+    screen, which shouted at a reviewer who was already looking at it and left
+    nothing louder to escalate to. Now the ground stays near-neutral and the
+    state is carried by a 3px rule down the leading edge plus a dot: legible at
+    a glance, still quiet enough to sit above a list of flags that need to be
+    the loudest thing on the page.
+  */
+  const TONE_INK: Record<string, string> = {
+    green: "var(--ink-green-2)",
+    amber: "var(--ink-amber-2)",
+    gray: "var(--outline-gray-3)",
+  };
+
   const box = (children: React.ReactNode, tone: Tone = "gray") => (
     <div
-      className="flex flex-wrap items-center gap-4 rounded-[var(--r)] p-5"
+      className="relative flex flex-wrap items-center gap-x-5 gap-y-3 overflow-hidden rounded-[var(--r)] py-4 pl-5 pr-4"
       style={{
-        background:
-          tone === "green"
-            ? "var(--surface-green-2)"
-            : tone === "amber"
-              ? "var(--surface-amber-2)"
-              : "var(--surface-white)",
-        border: `1px solid ${tone === "green" ? "var(--outline-green-1)" : tone === "amber" ? "var(--outline-amber-1)" : "var(--outline-gray-1)"}`,
-        boxShadow: "var(--sh-sm)",
+        background: "var(--surface-cards)",
+        boxShadow: "inset 0 0 0 1px var(--outline-gray-2)",
       }}
     >
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-[3px]"
+        style={{ background: TONE_INK[tone] ?? TONE_INK.gray }}
+      />
       {children}
     </div>
   );
-  const copy = (title: string, body: string) => (
+  const copy = (title: string, body: string, tone: Tone = "gray") => (
     <div className="min-w-0 flex-1">
-      <p className="text-[16px] font-semibold">{title}</p>
+      <p className="flex items-center gap-2 text-[16px] font-medium tracking-[-0.012em]">
+        <span
+          aria-hidden
+          className="size-2 shrink-0 rounded-full"
+          style={{ background: TONE_INK[tone] ?? TONE_INK.gray }}
+        />
+        {title}
+      </p>
       <p
-        className="mt-0.5 text-[13.5px]"
+        className="mt-1 pl-4 text-[13.5px] leading-relaxed"
         style={{ color: "var(--ink-gray-6)" }}
       >
         {body}
@@ -1413,6 +1492,7 @@ function ActionBar({
             "Uses your topic, your approved sources, and your style.",
             "用你的选题、已批准来源和你的语气来写。",
           ),
+          "amber",
         )}
         <Button
           variant="solid"
@@ -1438,6 +1518,7 @@ function ActionBar({
             "Pulls out every claim and matches it against your sources.",
             "把每条主张抓出来，和你的来源逐一对照。",
           ),
+          "amber",
         )}
         <Button
           variant="solid"
@@ -1470,6 +1551,7 @@ function ActionBar({
                 "Locking freezes this version so filming can start.",
                 "锁定后这一版就定了，可以开拍。",
               ),
+          mustFix.length ? "amber" : "green",
         )}
         <Button
           variant="solid"
@@ -1556,6 +1638,7 @@ function ActionBar({
           "Head to Publish for the captions and the checklist.",
           "去“发布”那边拿文案和清单。",
         ),
+        "green",
       )}
       <Badge tone="green" icon={Check}>
         {stateLabel(task.state, lang)}
@@ -1641,19 +1724,20 @@ function Task({
               key={x.id}
               type="button"
               onClick={() => setTaskId(x.id)}
-              className="rounded-full px-3 py-1.5 text-[13px] transition-colors"
+              className="press max-w-[18rem] truncate rounded-full px-3 py-1.5 text-[13px] [transition:background-color_140ms_var(--e-out),color_140ms_var(--e-out)]"
+              title={zh ? x.title_zh : x.title_en}
               style={{
                 background:
-                  x.id === taskId
-                    ? "var(--surface-gray-3)"
-                    : "var(--surface-white)",
-                border: "1px solid var(--outline-gray-1)",
+                  x.id === taskId ? "var(--surface-gray-3)" : "transparent",
+                boxShadow: "inset 0 0 0 1px var(--outline-gray-2)",
                 color:
                   x.id === taskId ? "var(--ink-gray-9)" : "var(--ink-gray-6)",
-                fontWeight: x.id === taskId ? 600 : 450,
+                fontWeight: x.id === taskId ? 550 : 400,
               }}
             >
-              {(zh ? x.title_zh : x.title_en).slice(0, 28)}
+              {/* Truncation is CSS, not a slice: a hard cut at 28 characters
+                  loses the ellipsis and lands mid-word. */}
+              {zh ? x.title_zh : x.title_en}
             </button>
           ))}
         </div>
@@ -1691,16 +1775,35 @@ function Task({
                   const level = LEVEL_LABEL[f.level] ?? LEVEL_LABEL.LOW;
                   const done = Boolean(f.resolution);
                   return (
+                    /*
+                      One flag, one card. The card itself stays neutral: three
+                      red-outlined boxes stacked on top of each other read as an
+                      alarm going off rather than as a list of three things to
+                      look at, and the reviewer still has to read every one.
+                      The level lives in the badge and in the 2px rule down the
+                      inside edge, which is enough to sort them at a glance.
+                    */
                     <div
                       key={f.id}
-                      className="rounded-[var(--r)] p-4"
+                      className="relative overflow-hidden rounded-[var(--r)] py-4 pl-5 pr-4"
                       style={{
                         background: done
-                          ? "var(--surface-gray-2)"
-                          : "var(--surface-white)",
-                        border: `1px solid ${done ? "var(--outline-gray-1)" : level.tone === "red" ? "var(--outline-red-1)" : "var(--outline-amber-1)"}`,
+                          ? "transparent"
+                          : "var(--surface-cards)",
+                        boxShadow: `inset 0 0 0 1px ${done ? "var(--outline-gray-1)" : "var(--outline-gray-2)"}`,
                       }}
                     >
+                      <span
+                        aria-hidden
+                        className="absolute inset-y-0 left-0 w-0.5"
+                        style={{
+                          background: done
+                            ? "var(--ink-green-2)"
+                            : level.tone === "red"
+                              ? "var(--ink-red-3)"
+                              : "var(--ink-amber-2)",
+                        }}
+                      />
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge tone={done ? "green" : level.tone}>
                           {done
@@ -1710,27 +1813,48 @@ function Task({
                               : level.en}
                         </Badge>
                         <span
-                          className="text-[13px]"
+                          className="t-sm"
                           style={{ color: "var(--ink-gray-6)" }}
                         >
                           {zh ? f.category_zh : f.category_en}
                         </span>
                       </div>
-                      <p className="mt-2.5 text-[15px] leading-relaxed">
-                        “{zh ? f.claim_zh : f.claim_en}”
-                      </p>
+
+                      {/*
+                        The flagged sentence, set as the quotation it is. A rule
+                        down its left says "this text is lifted out of the
+                        script" without spending a colour on saying it.
+                      */}
+                      <blockquote
+                        className="mt-3 border-l-2 pl-3 text-[15px] leading-relaxed"
+                        style={{ borderColor: "var(--outline-gray-3)" }}
+                      >
+                        {zh ? f.claim_zh : f.claim_en}
+                      </blockquote>
+
                       <p
-                        className="mt-2 text-[13.5px] leading-relaxed"
-                        style={{ color: "var(--ink-gray-6)" }}
+                        className="mt-3 text-[13.5px] leading-relaxed"
+                        style={{ color: "var(--ink-gray-7)" }}
                       >
                         {zh ? f.reason_zh : f.reason_en}
                       </p>
-                      <p
-                        className="mt-1.5 text-[12.5px] leading-relaxed"
-                        style={{ color: "var(--ink-gray-4)" }}
-                      >
-                        {t("Source says:", "来源写的是：")}{" "}
-                        {zh ? f.evidence_zh : f.evidence_en}
+                      {/*
+                        What the source actually says. This used to be a filled
+                        grey bar, which made it identical to the note field
+                        directly beneath it: one is evidence to read, the other
+                        is a box to type in, and they looked the same. Evidence
+                        is quiet text under a label; only the input keeps a fill.
+                      */}
+                      <p className="mt-3 text-[12.5px] leading-relaxed">
+                        <span
+                          className="t-2xs mr-1.5 uppercase tracking-[0.06em]"
+                          style={{ color: "var(--ink-gray-4)" }}
+                        >
+                          {t("Source says", "来源写的是")}
+                        </span>
+                        <span style={{ color: "var(--ink-gray-6)" }}>
+                          {zh ? f.evidence_zh : f.evidence_en}
+                        </span>
                       </p>
 
                       {done ? (
@@ -1750,7 +1874,7 @@ function Task({
                           ) : null}
                         </p>
                       ) : (
-                        <div className="mt-3.5">
+                        <div className="mt-4">
                           <Input
                             value={reason[f.id] ?? ""}
                             onChange={(e) =>
@@ -1760,43 +1884,78 @@ function Task({
                               }))
                             }
                             placeholder={t(
-                              "Add a note (required if it is not a real problem)",
-                              "写个说明（判断它不是问题时必填）",
+                              "Add a note. Required to dismiss.",
+                              "写个说明。判断它不是问题时必填。",
                             )}
                           />
-                          <div className="mt-2.5 flex flex-wrap gap-2">
-                            {(
-                              [
-                                "approved",
-                                "revised",
-                                "sourced",
-                                "dismissed",
-                              ] as const
-                            ).map((r) => (
-                              <Button
-                                key={r}
-                                size="sm"
-                                variant={r === "dismissed" ? "ghost" : "subtle"}
-                                title={
-                                  zh
-                                    ? RESOLUTION_LABEL[r].hint.zh
-                                    : RESOLUTION_LABEL[r].hint.en
-                                }
-                                onClick={() =>
-                                  act(`flags/${f.id}`, {
-                                    method: "POST",
-                                    body: JSON.stringify({
-                                      resolution: r,
-                                      reason: reason[f.id] ?? "",
-                                    }),
-                                  })
-                                }
-                              >
-                                {zh
-                                  ? RESOLUTION_LABEL[r].zh
-                                  : RESOLUTION_LABEL[r].en}
-                              </Button>
-                            ))}
+                          {/*
+                            Three decisions that accept the flag, and one that
+                            throws it away. The dismissal is separated by a rule
+                            and disabled until a reason exists, because it is the
+                            only one of the four the audit log cannot explain on
+                            its own, and the server rejects it without one.
+                          */}
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            {(["approved", "revised", "sourced"] as const).map(
+                              (r) => (
+                                <Button
+                                  key={r}
+                                  size="sm"
+                                  variant="outline"
+                                  title={
+                                    zh
+                                      ? RESOLUTION_LABEL[r].hint.zh
+                                      : RESOLUTION_LABEL[r].hint.en
+                                  }
+                                  onClick={() =>
+                                    act(`flags/${f.id}`, {
+                                      method: "POST",
+                                      body: JSON.stringify({
+                                        resolution: r,
+                                        reason: reason[f.id] ?? "",
+                                      }),
+                                    })
+                                  }
+                                >
+                                  {zh
+                                    ? RESOLUTION_LABEL[r].zh
+                                    : RESOLUTION_LABEL[r].en}
+                                </Button>
+                              ),
+                            )}
+                            <span
+                              aria-hidden
+                              className="mx-1 h-5 w-px"
+                              style={{ background: "var(--outline-gray-2)" }}
+                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={!(reason[f.id] ?? "").trim()}
+                              title={
+                                (reason[f.id] ?? "").trim()
+                                  ? zh
+                                    ? RESOLUTION_LABEL.dismissed.hint.zh
+                                    : RESOLUTION_LABEL.dismissed.hint.en
+                                  : t(
+                                      "Write a note first: dismissing a flag has to say why.",
+                                      "先写说明：判断它不是问题，必须写清楚原因。",
+                                    )
+                              }
+                              onClick={() =>
+                                act(`flags/${f.id}`, {
+                                  method: "POST",
+                                  body: JSON.stringify({
+                                    resolution: "dismissed",
+                                    reason: reason[f.id] ?? "",
+                                  }),
+                                })
+                              }
+                            >
+                              {zh
+                                ? RESOLUTION_LABEL.dismissed.zh
+                                : RESOLUTION_LABEL.dismissed.en}
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -1819,6 +1978,7 @@ function Task({
                   <Button
                     size="sm"
                     variant="ghost"
+                    icon={showScript ? ChevronUp : ChevronDown}
                     onClick={() => setShowScript((v) => !v)}
                   >
                     {showScript ? t("Hide", "收起") : t("Show", "展开")}
@@ -1826,9 +1986,11 @@ function Task({
                 }
               />
               {showScript ? (
-                <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.9]">
-                  {latest.body}
-                </p>
+                <ScriptReader
+                  body={String(latest.body ?? "")}
+                  sources={(detail.sources as SourceRow[]) ?? []}
+                  lang={lang}
+                />
               ) : null}
             </Card>
           ) : null}
@@ -1944,11 +2106,17 @@ function Publish({
   detail,
   act,
   busy,
+  tasks,
+  taskId,
+  setTaskId,
 }: {
   lang: Lang;
   detail: Row | null;
   act: ActFn;
   busy: boolean;
+  tasks: Row[];
+  taskId: string | null;
+  setTaskId: (v: string) => void;
 }) {
   const zh = lang === "zh";
   const t = (en: string, z: string) => (zh ? z : en);
@@ -1957,25 +2125,74 @@ function Publish({
   const packages = (detail?.packages as Row[]) ?? [];
   const task = detail?.task as Row | undefined;
 
-  if (
-    !task ||
-    ![
-      "VIDEO_READY",
-      "PUBLISH_PACKAGE_READY",
-      "PUBLISHED_MANUALLY",
-      "ANALYZED",
-    ].includes(task.state)
-  ) {
+  const READY = [
+    "VIDEO_READY",
+    "PUBLISH_PACKAGE_READY",
+    "PUBLISHED_MANUALLY",
+    "ANALYZED",
+  ];
+
+  if (!task || !READY.includes(task.state)) {
+    /*
+      A dead end here is a lie when another task is sitting ready. The old
+      empty state said "not ready yet" about whichever task happened to be
+      selected, with no way to see that a different one had its package
+      waiting. Now it names them and switches.
+    */
+    const ready = tasks.filter(
+      (x) => READY.includes(String(x.state)) && x.id !== taskId,
+    );
+
     return (
       <>
         <PageHead title={t("Publish", "发布")} />
         <EmptyState
           icon={Send}
-          title={t("Not ready yet", "还没到这一步")}
-          body={t(
-            "Captions and checklists get written once the script is locked and the video is in.",
-            "脚本锁定、成片上传之后，文案和清单才会生成。",
-          )}
+          title={
+            task
+              ? t("This one is not ready yet", "这条还没到发布这一步")
+              : t("Nothing to publish yet", "还没有可以发布的东西")
+          }
+          body={
+            task
+              ? t(
+                  `"${String(zh ? task.title_zh : task.title_en)}" is at: ${stateLabel(task.state, lang)}. Captions and the checklist get written once the script is locked and the video is in.`,
+                  `“${String(zh ? task.title_zh : task.title_en)}”现在是：${stateLabel(task.state, lang)}。脚本锁定、成片上传之后，文案和清单才会生成。`,
+                )
+              : t(
+                  "Captions and checklists get written once a script is locked and the video is in.",
+                  "脚本锁定、成片上传之后，文案和清单才会生成。",
+                )
+          }
+          action={
+            ready.length ? (
+              <div className="flex flex-col items-center gap-2">
+                <Meta>
+                  {t(
+                    ready.length === 1
+                      ? "One other task is ready:"
+                      : `${ready.length} other tasks are ready:`,
+                    ready.length === 1
+                      ? "另有 1 条已就绪："
+                      : `另有 ${ready.length} 条已就绪：`,
+                  )}
+                </Meta>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {ready.map((x) => (
+                    <Button
+                      key={x.id}
+                      size="sm"
+                      variant="outline"
+                      iconRight={ArrowRight}
+                      onClick={() => setTaskId(x.id)}
+                    >
+                      {String(zh ? x.title_zh : x.title_en).slice(0, 40)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : null
+          }
         />
       </>
     );

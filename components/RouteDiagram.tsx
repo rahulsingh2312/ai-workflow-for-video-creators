@@ -240,8 +240,7 @@ export function RouteDiagram({ lang }: { lang: Lang }) {
 
                 <span
                   className={clsx(
-                    "mono mt-3 text-[10.5px] leading-none [transition:color_300ms_var(--ease-out)]",
-                    active || passed ? "text-bone-faint" : "text-bone-faint/60",
+                    "mono mt-3 text-[11px] leading-none text-bone-faint",
                   )}
                 >
                   {state.post}
@@ -279,7 +278,7 @@ export function RouteDiagram({ lang }: { lang: Lang }) {
                     key={c}
                     className={clsx(
                       "flex items-start gap-2.5 text-[13px] leading-relaxed [transition:color_260ms_var(--ease-out)]",
-                      done ? "text-bone-dim" : "text-bone-faint/70",
+                      done ? "text-bone-dim" : "text-bone-faint",
                     )}
                   >
                     <span className="flex h-[1.6em] shrink-0 items-center">
