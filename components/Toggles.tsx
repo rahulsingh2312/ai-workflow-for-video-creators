@@ -3,16 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useSyncExternalStore } from "react";
-import { FOOTER } from "@/content/copy";
-import { LANGS, LANG_LABEL, swapLangInPath, tx, type Lang } from "@/lib/i18n";
+import { Moon, Sun } from "lucide-react";
+import { LANGS, LANG_LABEL, swapLangInPath, type Lang } from "@/lib/i18n";
 import { clsx } from "@/lib/clsx";
 
+/**
+ * Language. A segmented control, because there are exactly two and both of
+ * them are first-class: a dropdown would imply one is the default and the
+ * other is a translation.
+ */
 export function LangToggle({ lang }: { lang: Lang }) {
   const pathname = usePathname() ?? `/${lang}`;
 
   return (
     <div
-      className="flex items-center rounded-sm border border-rule bg-panel-inset p-[2px]"
+      className="flex h-8 items-center rounded-md border border-rule bg-panel-inset p-[3px]"
       role="group"
       aria-label={lang === "zh" ? "切换语言" : "Switch language"}
     >
@@ -28,10 +33,11 @@ export function LangToggle({ lang }: { lang: Lang }) {
             prefetch={false}
             aria-current={active ? "true" : undefined}
             className={clsx(
-              "plate rounded-[2px] px-2 py-1 text-[10px] transition-colors duration-150",
+              "flex h-full items-center rounded-[5px] px-2 text-[12px] leading-none",
+              "[transition:background-color_160ms_var(--ease-out),color_160ms_var(--ease-out)]",
               active
-                ? "bg-bone text-panel-deep"
-                : "text-bone-dim hover:bg-panel-raised hover:text-bone",
+                ? "bg-panel-raised font-medium text-bone"
+                : "text-bone-faint hov:text-bone",
             )}
           >
             {LANG_LABEL[l]}
@@ -58,16 +64,26 @@ const themeStore = {
 };
 
 /**
- * The panel light. Dark is the illuminated dispatch panel, light is the same
- * scheme plan printed on paper, so the control is a lamp switch rather than a
- * sun-and-moon icon.
+ * Ink or paper.
+ *
+ * Icon-only, because the label was never telling anyone anything the icon did
+ * not. The two glyphs cross-fade in place rather than swapping: the crossfade
+ * is masked with a small blur, which is what stops two overlapping shapes
+ * from reading as two objects during the 200ms they share the box.
  */
 export function PanelLight({ lang }: { lang: Lang }) {
-  const theme = useSyncExternalStore(themeStore.subscribe, themeStore.get, themeStore.getServer);
+  const theme = useSyncExternalStore(
+    themeStore.subscribe,
+    themeStore.get,
+    themeStore.getServer,
+  );
   const dark = theme !== "light";
 
   const toggle = useCallback(() => {
-    const value = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+    const value =
+      document.documentElement.getAttribute("data-theme") === "light"
+        ? "dark"
+        : "light";
     document.documentElement.setAttribute("data-theme", value);
     try {
       localStorage.setItem("tl-theme", value);
@@ -77,33 +93,45 @@ export function PanelLight({ lang }: { lang: Lang }) {
     window.dispatchEvent(new Event("tl-theme"));
   }, []);
 
+  const label = dark
+    ? lang === "zh"
+      ? "切换到浅色"
+      : "Switch to light"
+    : lang === "zh"
+      ? "切换到深色"
+      : "Switch to dark";
+
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-pressed={dark}
-      className="group flex items-center gap-2 rounded-sm border border-rule bg-panel-inset px-2 py-1 transition-colors duration-150 hover:border-rule-strong"
+      aria-label={label}
+      title={label}
+      className={clsx(
+        "press relative flex size-8 items-center justify-center rounded-md text-bone-dim",
+        "[transition:background-color_160ms_var(--ease-out),color_160ms_var(--ease-out)]",
+        "hov:bg-panel-raised",
+        "hov:text-bone",
+      )}
     >
-      <span className="plate text-[10px] text-bone-dim group-hover:text-bone">
-        {tx(FOOTER.theme, lang)}
-      </span>
-      <span
-        className="lamp inline-block h-2.5 w-2.5 rounded-full"
-        style={
-          dark
-            ? {
-                backgroundColor: "var(--lamp-amber)",
-                boxShadow: "0 0 10px 2px var(--halo-amber)",
-              }
-            : {
-                backgroundColor: "var(--panel-deep)",
-                boxShadow: "inset 0 1px 2px rgba(0,0,0,0.4)",
-              }
-        }
-      />
-      <span className="sr-only">
-        {dark ? tx(FOOTER.themeOn, lang) : tx(FOOTER.themeOff, lang)}
-      </span>
+      <Glyph icon={Sun} shown={!dark} />
+      <Glyph icon={Moon} shown={dark} />
     </button>
+  );
+}
+
+function Glyph({ icon: Icon, shown }: { icon: typeof Sun; shown: boolean }) {
+  return (
+    <Icon
+      aria-hidden
+      strokeWidth={1.75}
+      className={clsx(
+        "absolute size-4",
+        "[transition:opacity_200ms_var(--ease-out),transform_200ms_var(--ease-out),filter_200ms_var(--ease-out)]",
+        shown
+          ? "scale-100 opacity-100 blur-0"
+          : "scale-[0.85] opacity-0 blur-[2px]",
+      )}
+    />
   );
 }

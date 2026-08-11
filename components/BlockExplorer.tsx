@@ -6,19 +6,24 @@ import { COMMON } from "@/content/copy";
 import { tx, txs, type Lang } from "@/lib/i18n";
 import { clsx } from "@/lib/clsx";
 import { Signal } from "@/components/Signal";
+import { Label } from "@/components/Kit";
 
 /**
- * The line as a list you can interrogate. Selecting a block reads out what the
- * interlocking proves before the signal ahead of it will clear, which is the
- * only thing anyone actually wants to know about a workflow state.
+ * The line as a list you can interrogate.
+ *
+ * Selecting a block reads out what has to prove before the signal ahead of it
+ * clears, which is the only thing anyone actually wants to know about a
+ * workflow state. The selected row is marked by a filled ground and a rule
+ * down its inside edge rather than by colour, so the three colours on this
+ * page keep meaning what they mean everywhere else.
  */
 export function BlockExplorer({ lang }: { lang: Lang }) {
   const [selected, setSelected] = useState(4); // FACT_REVIEW, where the work is
   const state = STATES[selected];
 
   return (
-    <div className="grid gap-px overflow-hidden rounded-sm border border-rule bg-rule lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-      <ol className="bg-panel-deep">
+    <div className="overflow-hidden rounded-xl border border-rule lg:grid lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+      <ol className="border-b border-rule bg-panel lg:border-b-0 lg:border-r">
         {STATES.map((s, i) => {
           const active = i === selected;
           return (
@@ -28,32 +33,46 @@ export function BlockExplorer({ lang }: { lang: Lang }) {
                 onClick={() => setSelected(i)}
                 aria-current={active ? "true" : undefined}
                 className={clsx(
-                  "group flex w-full items-center gap-3 border-b border-rule px-4 py-3 text-left transition-colors duration-150 last:border-b-0",
-                  active ? "bg-panel-raised" : "hover:bg-panel",
+                  "group relative flex w-full items-center gap-3 px-5 py-3 text-left",
+                  "[transition:background-color_160ms_var(--ease-out)]",
+                  active ? "bg-panel-raised" : "hov:bg-panel-deep",
                 )}
               >
+                {/* The marker for "you are here". 2px, inside edge, no colour. */}
+                <span
+                  aria-hidden
+                  className={clsx(
+                    "absolute inset-y-0 left-0 w-0.5 [transition:background-color_160ms_var(--ease-out)]",
+                    active ? "bg-bone" : "bg-transparent",
+                  )}
+                />
                 <Signal aspect={active ? "caution" : "dark"} size="sm" />
-                <span className="plate data w-7 shrink-0 text-[10px] text-bone-faint">{s.post}</span>
+                <span className="mono w-7 shrink-0 text-[11px] text-bone-faint">
+                  {s.post}
+                </span>
                 <span className="min-w-0 flex-1">
                   <span
                     className={clsx(
-                      "plate block truncate text-[10px] transition-colors duration-150",
-                      active ? "text-bone" : "text-bone-dim group-hover:text-bone",
+                      "block truncate text-[14px] [transition:color_160ms_var(--ease-out)]",
+                      active
+                        ? "font-medium text-bone"
+                        : "text-bone-dim group-hov:text-bone",
                     )}
                   >
-                    {s.code}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[13px] text-bone-dim">
                     {tx(s.name, lang)}
+                  </span>
+                  <span className="mono mt-0.5 block truncate text-[11px] text-bone-faint">
+                    {s.code}
                   </span>
                 </span>
                 {s.beyondAuthority ? (
                   <span
                     aria-hidden
-                    className="h-6 w-[3px] shrink-0"
+                    title="Beyond the boundary"
+                    className="h-7 w-px shrink-0"
                     style={{
-                      backgroundImage:
-                        "repeating-linear-gradient(180deg, var(--lamp-red) 0 4px, transparent 4px 8px)",
+                      background:
+                        "repeating-linear-gradient(180deg, var(--lamp-red) 0 3px, transparent 3px 6px)",
                     }}
                   />
                 ) : null}
@@ -63,39 +82,56 @@ export function BlockExplorer({ lang }: { lang: Lang }) {
         })}
       </ol>
 
-      <div className="bg-panel p-6 sm:p-8">
-        <p className="plate data text-[10px] text-bone-faint">
-          {tx(COMMON.post, lang)} {state.post} · {state.code}
+      {/*
+        Keyed on the selected state so the panel replays its entrance when the
+        contents change. Without the key the text swaps in place, which reads
+        as a glitch rather than as a new record being pulled.
+      */}
+      <div key={state.code} className="rise bg-panel-raised p-6 sm:p-9">
+        <p className="mono text-[11.5px] text-bone-faint">
+          {state.post} · {state.code}
         </p>
-        <h3 className="display mt-3 text-3xl font-semibold sm:text-4xl">{tx(state.name, lang)}</h3>
-        <p className="measure mt-4 text-[15px] leading-relaxed text-bone-dim">
+        <h3 className="display mt-3 text-[clamp(1.75rem,3vw,2.5rem)]">
+          {tx(state.name, lang)}
+        </h3>
+        <p className="lede measure mt-4 text-[17px] text-bone-dim">
           {tx(state.meaning, lang)}
         </p>
 
-        <div className="mt-8 grid gap-8 sm:grid-cols-[minmax(0,1fr)_minmax(0,14rem)]">
+        <div className="mt-9 grid gap-9 sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)] sm:gap-10">
           <div>
-            <h4 className="plate text-[10px] text-bone-faint">{tx(COMMON.conditions, lang)}</h4>
-            <ul className="mt-3 space-y-2">
+            <Label>{tx(COMMON.conditions, lang)}</Label>
+            <ul className="mt-3.5 space-y-2.5">
               {txs(state.conditions, lang).map((c) => (
-                <li key={c} className="flex items-start gap-2.5 text-[14px] leading-snug">
-                  <Signal
-                    aspect={state.beyondAuthority ? "dark" : "clear"}
-                    size="xs"
-                    className="mt-[7px]"
-                  />
+                <li
+                  key={c}
+                  className="flex items-start gap-3 text-[14px] leading-relaxed"
+                >
+                  <span className="flex h-[1.6em] shrink-0 items-center">
+                    <Signal
+                      aspect={state.beyondAuthority ? "dark" : "clear"}
+                      size="xs"
+                    />
+                  </span>
                   <span className="text-bone-dim">{c}</span>
                 </li>
               ))}
             </ul>
           </div>
-          <dl className="space-y-5 border-t border-rule pt-5 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+          <dl className="space-y-6 border-t border-rule pt-6 sm:border-l sm:border-t-0 sm:pl-8 sm:pt-0">
             <div>
-              <dt className="plate text-[10px] text-bone-faint">{tx(COMMON.role, lang)}</dt>
-              <dd className="mt-1.5 text-[14px] text-bone">{tx(state.role, lang)}</dd>
+              <dt>
+                <Label>{tx(COMMON.role, lang)}</Label>
+              </dt>
+              <dd className="mt-2 text-[14.5px] text-bone">
+                {tx(state.role, lang)}
+              </dd>
             </div>
             <div>
-              <dt className="plate text-[10px] text-bone-faint">{tx(COMMON.produces, lang)}</dt>
-              <dd className="mt-1.5 text-[14px] leading-snug text-bone-dim">
+              <dt>
+                <Label>{tx(COMMON.produces, lang)}</Label>
+              </dt>
+              <dd className="mt-2 text-[14px] leading-relaxed text-bone-dim">
                 {tx(state.produces, lang)}
               </dd>
             </div>

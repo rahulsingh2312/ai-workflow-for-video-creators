@@ -379,7 +379,7 @@ export function Workspace({ lang, session }: { lang: Lang; session: Session }) {
                 router.push(`/${lang}/login`);
                 router.refresh();
               }}
-              className="rounded-[var(--r-sm)] p-1.5 [transition:background-color_120ms_var(--e-out)] [@media(hover:hover)and(pointer:fine)]:hover:bg-[var(--rail-active)]"
+              className="rounded-[var(--r-sm)] p-1.5 [transition:background-color_120ms_var(--e-out)] hov:bg-[var(--rail-active)]"
             >
               <LogOut
                 className="h-4 w-4"
@@ -835,99 +835,109 @@ function HomeScreen({
         ) : null}
       </div>
 
-      <div className="app-stagger grid gap-4 lg:grid-cols-2">
-        {state && held.length ? (
+      {/*
+        Two named columns rather than an auto-flowing grid. With an odd number
+        of cards, auto-flow leaves a hole in the last row and the page reads as
+        unfinished; naming the columns also says something true, which is that
+        the left one is the work and the right one is what is arriving.
+      */}
+      <div className="app-stagger grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)] lg:items-start">
+        <div className="min-w-0 space-y-4">
+          {state && held.length ? (
+            <Card>
+              <CardHeader
+                title={t("Before this can move on", "还差这些才能往下走")}
+                subtitle={t("Each one has to be true.", "每一条都必须成立。")}
+              />
+              <ul>
+                {proof!.conditions.map((c) => (
+                  <CheckRow key={c.key} done={c.proved} detail={c.detail}>
+                    {zh ? c.label_zh : c.label_en}
+                  </CheckRow>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
+          <Card>
+            <CardHeader title={t("Videos in progress", "进行中的内容")} />
+            {tasks.length ? (
+              <ul className="space-y-1">
+                {tasks.map((x) => (
+                  <li key={x.id} className="flex items-center gap-3 py-2">
+                    <Dot tone={x.state === "ANALYZED" ? "green" : "amber"} />
+                    <span className="min-w-0 flex-1 truncate text-[14px]">
+                      {zh ? x.title_zh : x.title_en}
+                    </span>
+                    <Badge tone={x.state === "ANALYZED" ? "green" : "gray"}>
+                      {stateLabel(x.state, lang)}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Meta>{t("Nothing in progress.", "暂时没有进行中的内容。")}</Meta>
+            )}
+          </Card>
+
           <Card>
             <CardHeader
-              title={t("Before this can move on", "还差这些才能往下走")}
-              subtitle={t("Each one has to be true.", "每一条都必须成立。")}
+              title={t("Recent activity", "最近的操作")}
+              action={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={ChevronRight}
+                  onClick={() => go("activity")}
+                />
+              }
             />
-            <ul>
-              {proof!.conditions.map((c) => (
-                <CheckRow key={c.key} done={c.proved} detail={c.detail}>
-                  {zh ? c.label_zh : c.label_en}
-                </CheckRow>
+            <ul className="space-y-1">
+              {activity.slice(0, 6).map((e) => (
+                <li key={e.id} className="flex items-center gap-3 py-1.5">
+                  <span
+                    className="min-w-0 flex-1 truncate text-[13.5px]"
+                    style={{ color: "var(--ink-gray-6)" }}
+                  >
+                    {describeEvent(e, lang)}
+                  </span>
+                  <Meta>{String(e.created_at).slice(11, 16)}</Meta>
+                </li>
               ))}
             </ul>
           </Card>
-        ) : null}
+        </div>
 
-        <Card>
-          <CardHeader title={t("Videos in progress", "进行中的内容")} />
-          {tasks.length ? (
-            <ul className="space-y-1">
-              {tasks.map((x) => (
-                <li key={x.id} className="flex items-center gap-3 py-2">
-                  <Dot tone={x.state === "ANALYZED" ? "green" : "amber"} />
-                  <span className="min-w-0 flex-1 truncate text-[14px]">
-                    {zh ? x.title_zh : x.title_en}
-                  </span>
-                  <Badge tone={x.state === "ANALYZED" ? "green" : "gray"}>
-                    {stateLabel(x.state, lang)}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Meta>{t("Nothing in progress.", "暂时没有进行中的内容。")}</Meta>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader
-            title={t("New leads", "新线索")}
-            action={
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={ChevronRight}
-                onClick={() => go("leads")}
-              />
-            }
-          />
-          {leads.length ? (
-            <ul className="space-y-1">
-              {leads.slice(0, 4).map((l) => (
-                <li key={l.id} className="flex items-center gap-3 py-2">
-                  <Dot tone={l.score >= 80 ? "red" : "amber"} />
-                  <span className="min-w-0 flex-1 truncate text-[14px]">
-                    {l.contact}
-                  </span>
-                  <Meta>{l.intent}</Meta>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Meta>{t("No leads yet.", "还没有线索。")}</Meta>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader
-            title={t("Recent activity", "最近的操作")}
-            action={
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={ChevronRight}
-                onClick={() => go("activity")}
-              />
-            }
-          />
-          <ul className="space-y-1">
-            {activity.slice(0, 6).map((e) => (
-              <li key={e.id} className="flex items-center gap-3 py-1.5">
-                <span
-                  className="min-w-0 flex-1 truncate text-[13.5px]"
-                  style={{ color: "var(--ink-gray-6)" }}
-                >
-                  {describeEvent(e, lang)}
-                </span>
-                <Meta>{String(e.created_at).slice(11, 16)}</Meta>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <div className="min-w-0 space-y-4">
+          <Card>
+            <CardHeader
+              title={t("New leads", "新线索")}
+              action={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={ChevronRight}
+                  onClick={() => go("leads")}
+                />
+              }
+            />
+            {leads.length ? (
+              <ul className="space-y-1">
+                {leads.slice(0, 4).map((l) => (
+                  <li key={l.id} className="flex items-center gap-3 py-2">
+                    <Dot tone={l.score >= 80 ? "red" : "amber"} />
+                    <span className="min-w-0 flex-1 truncate text-[14px]">
+                      {l.contact}
+                    </span>
+                    <Meta>{l.intent}</Meta>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Meta>{t("No leads yet.", "还没有线索。")}</Meta>
+            )}
+          </Card>
+        </div>
       </div>
     </>
   );
@@ -940,7 +950,15 @@ function HomeScreen({
   date, priority, who decided. The title track is the only flexible one, so it
   absorbs every width difference and nothing else drifts between rows.
 */
-const TOPIC_COLUMNS = ["auto", "2.5rem", "minmax(0,1fr)", "13rem", "6.5rem", "5.5rem", "2rem"];
+const TOPIC_COLUMNS = [
+  "auto",
+  "2.5rem",
+  "minmax(0,1fr)",
+  "13rem",
+  "6.5rem",
+  "5.5rem",
+  "2rem",
+];
 
 function Topics({
   lang,
@@ -967,11 +985,24 @@ function Topics({
   const sources = (topics?.sources as Row[]) ?? [];
   const risks = (topics?.risks as Row[]) ?? [];
 
-  const scoped = tab === "waiting" ? candidates.filter((c) => !c.decision) : candidates;
+  const scoped =
+    tab === "waiting" ? candidates.filter((c) => !c.decision) : candidates;
   const groups = [
-    { key: "waiting", label: t("Waiting on you", "等你处理"), rows: scoped.filter((c) => !c.decision) },
-    { key: "accepted", label: t("Taken", "已采用"), rows: scoped.filter((c) => c.decision === "accepted") },
-    { key: "rejected", label: t("Passed on", "已放过"), rows: scoped.filter((c) => c.decision === "rejected") },
+    {
+      key: "waiting",
+      label: t("Waiting on you", "等你处理"),
+      rows: scoped.filter((c) => !c.decision),
+    },
+    {
+      key: "accepted",
+      label: t("Taken", "已采用"),
+      rows: scoped.filter((c) => c.decision === "accepted"),
+    },
+    {
+      key: "rejected",
+      label: t("Passed on", "已放过"),
+      rows: scoped.filter((c) => c.decision === "rejected"),
+    },
   ].filter((g) => g.rows.length);
 
   const sourcesFor = (id: string) =>
@@ -982,21 +1013,35 @@ function Topics({
   const risksFor = (id: string) => risks.filter((r) => r.candidate_id === id);
   const level = (score: number): "high" | "medium" | "low" =>
     score >= 80 ? "high" : score >= 65 ? "medium" : "low";
-  const levelLabel = { high: t("High", "高"), medium: t("Medium", "中"), low: t("Low", "低") };
+  const levelLabel = {
+    high: t("High", "高"),
+    medium: t("Medium", "中"),
+    low: t("Low", "低"),
+  };
 
   return (
     <>
       <div className="flex items-center gap-3 px-6 pt-5">
-        <h1 className="min-w-0 flex-1 truncate text-[16px] font-medium" style={{ color: "var(--ink-gray-8)" }}>
+        <h1
+          className="min-w-0 flex-1 truncate text-[16px] font-medium"
+          style={{ color: "var(--ink-gray-8)" }}
+        >
           {t("Topics", "选题")}
         </h1>
-        <PrimaryAction icon={Sparkles} loading={busy} onClick={() => act("topics", { method: "POST", body: "{}" })}>
+        <PrimaryAction
+          icon={Sparkles}
+          loading={busy}
+          onClick={() => act("topics", { method: "POST", body: "{}" })}
+        >
           {t("Find topics", "找选题")}
         </PrimaryAction>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 px-6 pt-5">
-        <div className="flex items-center rounded-[var(--r-sm)] p-[3px]" style={{ background: "var(--rail)" }}>
+        <div
+          className="flex items-center rounded-[var(--r-sm)] p-[3px]"
+          style={{ background: "var(--rail)" }}
+        >
           {(
             [
               ["waiting", t("Waiting", "待处理")],
@@ -1018,7 +1063,10 @@ function Topics({
             </button>
           ))}
         </div>
-        <span className="ml-auto text-[13px]" style={{ color: "var(--ink-gray-5)" }}>
+        <span
+          className="ml-auto text-[13px]"
+          style={{ color: "var(--ink-gray-5)" }}
+        >
           {scoped.length} {t("topics", "条")}
         </span>
       </div>
@@ -1026,8 +1074,16 @@ function Topics({
       <div className="px-6 pb-10 pt-4">
         {!groups.length ? (
           <div className="flex flex-col items-center gap-1 py-16 text-center">
-            <Lightbulb className="size-6" strokeWidth={1.5} style={{ color: "var(--ink-gray-4)" }} aria-hidden />
-            <p className="text-[14px] font-medium" style={{ color: "var(--ink-gray-7)" }}>
+            <Lightbulb
+              className="size-6"
+              strokeWidth={1.5}
+              style={{ color: "var(--ink-gray-4)" }}
+              aria-hidden
+            />
+            <p
+              className="text-[14px] font-medium"
+              style={{ color: "var(--ink-gray-7)" }}
+            >
               {t("Nothing waiting", "没有待处理的候选")}
             </p>
             <p className="text-[13px]" style={{ color: "var(--ink-gray-5)" }}>
@@ -1046,7 +1102,9 @@ function Topics({
                   count={g.rows.length}
                   open={open}
                   lang={lang}
-                  onToggle={() => setCollapsed((p) => ({ ...p, [g.key]: open }))}
+                  onToggle={() =>
+                    setCollapsed((p) => ({ ...p, [g.key]: open }))
+                  }
                 />
                 {open ? (
                   <List columns={TOPIC_COLUMNS} className="mt-1">
@@ -1057,7 +1115,9 @@ function Topics({
                       const expanded = openId === c.id;
                       return (
                         <div key={c.id}>
-                          <ListRow onClick={() => setOpenId(expanded ? null : c.id)}>
+                          <ListRow
+                            onClick={() => setOpenId(expanded ? null : c.id)}
+                          >
                             <ListCell>
                               <StatusGlyph
                                 kind={
@@ -1070,26 +1130,42 @@ function Topics({
                               />
                             </ListCell>
                             <ListCell>
-                              <span className="text-[13px] tabular-nums" style={{ color: "var(--ink-gray-4)" }}>
+                              <span
+                                className="text-[13px] tabular-nums"
+                                style={{ color: "var(--ink-gray-4)" }}
+                              >
                                 {c.score}
                               </span>
                             </ListCell>
                             <ListCell>
-                              <span className="truncate text-[14px] font-medium" style={{ color: "var(--ink-gray-8)" }}>
+                              <span
+                                className="truncate text-[14px] font-medium"
+                                style={{ color: "var(--ink-gray-8)" }}
+                              >
                                 {zh ? c.title_zh : c.title_en}
                               </span>
                             </ListCell>
                             <ListCell className="gap-1.5 overflow-hidden">
-                              <Tag label={`${mine.length} ${t("sources", "来源")}`} dot={DOT.gray} />
+                              <Tag
+                                label={`${mine.length} ${t("sources", "来源")}`}
+                                dot={DOT.gray}
+                              />
                               {myRisks.slice(0, 1).map((r) => (
                                 <Tag
                                   key={r.id}
                                   label={zh ? r.note_zh : r.note_en}
-                                  dot={r.level === "HIGH" || r.level === "CRITICAL" ? DOT.red : DOT.amber}
+                                  dot={
+                                    r.level === "HIGH" || r.level === "CRITICAL"
+                                      ? DOT.red
+                                      : DOT.amber
+                                  }
                                 />
                               ))}
                               {myRisks.length > 1 ? (
-                                <span className="shrink-0 text-[12px]" style={{ color: "var(--ink-gray-4)" }}>
+                                <span
+                                  className="shrink-0 text-[12px]"
+                                  style={{ color: "var(--ink-gray-4)" }}
+                                >
                                   +{myRisks.length - 1}
                                 </span>
                               ) : null}
@@ -1109,7 +1185,9 @@ function Topics({
                               <Priority level={lv} label={levelLabel[lv]} />
                             </ListCell>
                             <ListCell className="justify-end">
-                              {c.decided_by_name ? <Avatar name={String(c.decided_by_name)} /> : null}
+                              {c.decided_by_name ? (
+                                <Avatar name={String(c.decided_by_name)} />
+                              ) : null}
                             </ListCell>
                           </ListRow>
 
@@ -1120,23 +1198,38 @@ function Topics({
                             >
                               <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
-                                  <p className="text-[12px] font-medium" style={{ color: "var(--ink-gray-5)" }}>
+                                  <p
+                                    className="text-[12px] font-medium"
+                                    style={{ color: "var(--ink-gray-5)" }}
+                                  >
                                     {t("Why now", "为什么是现在")}
                                   </p>
-                                  <p className="mt-1 text-[13px] leading-normal" style={{ color: "var(--ink-gray-7)" }}>
+                                  <p
+                                    className="mt-1 text-[13px] leading-normal"
+                                    style={{ color: "var(--ink-gray-7)" }}
+                                  >
                                     {zh ? c.why_zh : c.why_en}
                                   </p>
                                 </div>
                                 <div>
-                                  <p className="text-[12px] font-medium" style={{ color: "var(--ink-gray-5)" }}>
+                                  <p
+                                    className="text-[12px] font-medium"
+                                    style={{ color: "var(--ink-gray-5)" }}
+                                  >
                                     {t("Why this score", "为什么是这个分")}
                                   </p>
-                                  <p className="mt-1 text-[13px] leading-normal" style={{ color: "var(--ink-gray-7)" }}>
+                                  <p
+                                    className="mt-1 text-[13px] leading-normal"
+                                    style={{ color: "var(--ink-gray-7)" }}
+                                  >
                                     {zh ? c.reason_zh : c.reason_en}
                                   </p>
                                 </div>
                                 <div className="sm:col-span-2">
-                                  <p className="text-[12px] font-medium" style={{ color: "var(--ink-gray-5)" }}>
+                                  <p
+                                    className="text-[12px] font-medium"
+                                    style={{ color: "var(--ink-gray-5)" }}
+                                  >
                                     {t("Based on", "依据")}
                                   </p>
                                   <ul className="mt-1 space-y-1">
@@ -1149,10 +1242,19 @@ function Topics({
                                         <span
                                           aria-hidden
                                           className="h-1.5 w-1.5 shrink-0 rounded-full"
-                                          style={{ background: x.trust === "high" ? DOT.green : DOT.amber }}
+                                          style={{
+                                            background:
+                                              x.trust === "high"
+                                                ? DOT.green
+                                                : DOT.amber,
+                                          }}
                                         />
                                         {zh ? x.label_zh : x.label_en}
-                                        <span style={{ color: "var(--ink-gray-4)" }}>{x.published_at}</span>
+                                        <span
+                                          style={{ color: "var(--ink-gray-4)" }}
+                                        >
+                                          {x.published_at}
+                                        </span>
                                       </li>
                                     ))}
                                   </ul>
@@ -1165,13 +1267,24 @@ function Topics({
                                     <Field
                                       id={`r-${c.id}`}
                                       label={t("Your reason", "你的理由")}
-                                      hint={t("It teaches the next round what you like.", "下一轮会照着你的口味来。")}
+                                      hint={t(
+                                        "It teaches the next round what you like.",
+                                        "下一轮会照着你的口味来。",
+                                      )}
                                     >
                                       <Input
                                         id={`r-${c.id}`}
                                         value={reason[c.id] ?? ""}
-                                        onChange={(e) => setReason((p) => ({ ...p, [c.id]: e.target.value }))}
-                                        placeholder={t("Good timing and a solid source", "时机好，来源也扎实")}
+                                        onChange={(e) =>
+                                          setReason((p) => ({
+                                            ...p,
+                                            [c.id]: e.target.value,
+                                          }))
+                                        }
+                                        placeholder={t(
+                                          "Good timing and a solid source",
+                                          "时机好，来源也扎实",
+                                        )}
                                       />
                                     </Field>
                                   </div>
@@ -1179,10 +1292,16 @@ function Topics({
                                     variant="solid"
                                     disabled={!(reason[c.id] ?? "").trim()}
                                     onClick={async () => {
-                                      const d = await act(`topics/${c.id}/decide`, {
-                                        method: "POST",
-                                        body: JSON.stringify({ decision: "accepted", reason: reason[c.id] }),
-                                      });
+                                      const d = await act(
+                                        `topics/${c.id}/decide`,
+                                        {
+                                          method: "POST",
+                                          body: JSON.stringify({
+                                            decision: "accepted",
+                                            reason: reason[c.id],
+                                          }),
+                                        },
+                                      );
                                       if (d) go("task");
                                     }}
                                   >
@@ -1193,7 +1312,10 @@ function Topics({
                                     onClick={() =>
                                       act(`topics/${c.id}/decide`, {
                                         method: "POST",
-                                        body: JSON.stringify({ decision: "rejected", reason: reason[c.id] }),
+                                        body: JSON.stringify({
+                                          decision: "rejected",
+                                          reason: reason[c.id],
+                                        }),
                                       })
                                     }
                                   >
@@ -1201,8 +1323,12 @@ function Topics({
                                   </Button>
                                 </div>
                               ) : c.decision_reason ? (
-                                <p className="mt-3 text-[13px]" style={{ color: "var(--ink-gray-5)" }}>
-                                  {t("You said:", "你写的理由：")} {c.decision_reason}
+                                <p
+                                  className="mt-3 text-[13px]"
+                                  style={{ color: "var(--ink-gray-5)" }}
+                                >
+                                  {t("You said:", "你写的理由：")}{" "}
+                                  {c.decision_reason}
                                 </p>
                               ) : null}
                             </div>
@@ -1220,7 +1346,6 @@ function Topics({
     </>
   );
 }
-
 
 /** One prominent action, chosen from where the task actually is. */
 function ActionBar({

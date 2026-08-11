@@ -19,7 +19,7 @@ export default async function SiteLayout({
     <div className="min-h-dvh bg-panel text-bone">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-sm focus:bg-lamp-amber focus:px-4 focus:py-2 focus:font-medium focus:text-panel-deep"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-bone focus:px-4 focus:py-2.5 focus:text-[14px] focus:font-medium focus:text-panel focus:shadow-[var(--shadow-lift)]"
       >
         {l === "zh" ? "跳到正文" : "Skip to content"}
       </a>

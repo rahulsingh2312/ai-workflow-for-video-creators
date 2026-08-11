@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo, Big_Shoulders, Inter } from "next/font/google";
+import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import "../globals.css";
@@ -7,29 +7,40 @@ import { brand } from "@/lib/brand";
 import { LANGS, isLang, type Lang } from "@/lib/i18n";
 
 /*
-  Archivo carries the width axis, which is the whole reason it is here: one
-  design narrowed for a signage plate and set normal for reading, the way
-  DIN 1451 uses Engschrift and Mittelschrift. Big Shoulders is the display
-  voice, drawn for civic wayfinding, with an optical size axis.
+  THREE VOICES, AND EACH ONE HAS A JOB.
+
+  Geist speaks in the product's own voice: headlines, controls, interface. It
+  is a neo-grotesque with flat terminals and a tall x-height, which is what
+  lets a 72px headline and a 12px button label look like the same person
+  talking.
+
+  Newsreader is the editorial voice, and it exists here almost entirely for
+  its italic. The italic is a true cursive cut, not a slanted roman, so it
+  reads as a change of register rather than a change of angle: the site uses
+  it wherever the page says something in its own words instead of the
+  product's. Its optical-size axis means the same face can carry a 64px
+  headline accent and a 15px aside without either one looking stretched.
+
+  Geist Mono carries measurement: state enums, version numbers, timestamps,
+  confidence scores, source IDs. Nothing decorative is ever set in it.
 */
-const archivo = Archivo({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-archivo",
-  axes: ["wdth"],
+  variable: "--font-geist",
   display: "swap",
 });
 
-const bigShoulders = Big_Shoulders({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  variable: "--font-big-shoulders",
+  variable: "--font-geist-mono",
+  display: "swap",
+});
+
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  variable: "--font-newsreader",
+  style: ["normal", "italic"],
   axes: ["opsz"],
-  display: "swap",
-});
-
-/* Inter is what Frappe's desk is set in, and the workspace follows it. */
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
   display: "swap",
 });
 
@@ -88,30 +99,32 @@ export default async function RootLayout({
       lang={l === "zh" ? "zh-Hans" : "en"}
       data-theme="dark"
       suppressHydrationWarning
-      className={`${archivo.variable} ${bigShoulders.variable} ${inter.variable} ${notoSC.variable}`}
+      className={`${geist.variable} ${geistMono.variable} ${newsreader.variable} ${notoSC.variable}`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-dvh antialiased">
         {/*
-          THESIS: this product's value is what it refuses to do, so the page is a
-          signalling diagram, not a hero over three feature cards.
-          OWN-WORLD: vitreous enamel grey-green panel (light rendition: the same
-          scheme plan printed on drafting paper), bone engraved track lines,
-          Archivo's width axis as DIN-style signage lettering, Big Shoulders as
-          display. Exactly three saturated colours exist, all signal aspects:
-          red at danger, amber proving, green cleared. Nothing else is coloured.
-          STORY: the visitor reads the eleven states as a signalled line, watches
-          a route prove itself condition by condition, and understands the
-          missing publish button as a boundary marker rather than a gap.
-          FIRST VIEWPORT: full-bleed schematic of eleven blocks with numbered
-          signal posts, headline set low and left over it, a route-call control,
-          and the boundary marker standing before PUBLISHED_MANUALLY.
-          FORM: signalling scheme plan plus interlocking table, candidate 5 of 7,
-          seed key 07e3c3c2.
-          FINISH: unreviewed and undocumented is unfinished; this build ends with
-          the finish review, the verdict, and DESIGN.md
+          THESIS: this product's value is what it refuses to do, and refusal is
+          only credible when the record behind it is legible. So the site is
+          built as a record: ink on a quiet ground, every claim carrying its
+          reference, nothing decorative competing with the evidence.
+
+          OWN-WORLD: near-black ink and warm paper. Geist for the product's
+          voice, Newsreader italic wherever the page speaks in its own, Geist
+          Mono for anything measured. Exactly three saturated colours exist and
+          all three carry state: red at a stop, amber under review, green
+          cleared. If it is coloured, it means something.
+
+          STORY: the visitor sees the eleven states as a single line, watches a
+          task prove itself condition by condition, and reads the missing
+          publish button as the edge of the system's authority.
+
+          FIRST VIEWPORT: one sentence set large, the line running beneath it,
+          and the boundary standing where the product stops and a person starts.
+
+          FINISH: unreviewed and undocumented is unfinished.
         */}
         {children}
       </body>

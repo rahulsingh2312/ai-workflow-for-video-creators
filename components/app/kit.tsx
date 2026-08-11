@@ -108,9 +108,8 @@ export function Button({
         "active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100",
         SIZE[size],
         full && "w-full",
-        "[@media(hover:hover)and(pointer:fine)]:hover:brightness-[0.96]",
-        variant === "ghost" &&
-          "[@media(hover:hover)and(pointer:fine)]:hover:bg-[var(--surface-gray-2)]",
+        "hov:brightness-[0.96]",
+        variant === "ghost" && "hov:bg-[var(--surface-gray-2)]",
         className,
       )}
     >
@@ -269,7 +268,7 @@ export function ListRow({
       className={clsx(
         "flex w-full items-center gap-3 px-4 py-2.5 text-left",
         onClick &&
-          "[transition:background-color_120ms_var(--e-out)] [@media(hover:hover)and(pointer:fine)]:hover:bg-[var(--surface-gray-1)]",
+          "[transition:background-color_120ms_var(--e-out)] hov:bg-[var(--surface-gray-1)]",
         className,
       )}
       style={{ borderBottom: "1px solid var(--outline-gray-1)" }}

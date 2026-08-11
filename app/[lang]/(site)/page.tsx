@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 import { AGENTS, CONTRACT } from "@/content/agents";
 import { HERO, SECTIONS } from "@/content/copy";
 import { REFUSALS } from "@/content/refusals";
@@ -11,8 +12,14 @@ import { PersonaThread } from "@/components/PersonaThread";
 import { RouteDiagram } from "@/components/RouteDiagram";
 import { Section, Shell } from "@/components/Section";
 import { Signal } from "@/components/Signal";
+import { ButtonLink, Label } from "@/components/Kit";
+import { voiced } from "@/components/Voice";
 
-export default async function Landing({ params }: { params: Promise<{ lang: string }> }) {
+export default async function Landing({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}) {
   const { lang: raw } = await params;
   if (!isLang(raw)) notFound();
   const lang = raw as Lang;
@@ -20,83 +27,84 @@ export default async function Landing({ params }: { params: Promise<{ lang: stri
 
   return (
     <>
-      {/* ── First viewport ─────────────────────────────────────────────────── */}
-      <RouteDiagram lang={lang} />
-
-      <Shell className="py-14 sm:py-20">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:gap-16">
-          <div>
-            <h1 className="display max-w-[16ch] text-[clamp(2.75rem,8vw,5.75rem)] font-semibold">
-              {tx(HERO.h1, lang)}
-            </h1>
-            <p className="measure mt-7 text-[16px] leading-relaxed text-bone-dim sm:text-[17px]">
-              {tx(HERO.sub, lang).replace("{name}", name)}
-            </p>
-            <div className="mt-9 flex flex-wrap items-center gap-3">
-              <Link
-                href={`/${lang}/workspace`}
-                prefetch={false}
-                className="plate rounded-sm bg-bone px-5 py-3 text-[11px] text-panel-deep transition-colors duration-150 hover:bg-lamp-amber"
-              >
-                {tx(HERO.primary, lang)}
-              </Link>
-              <Link
-                href={`/${lang}/workflow`}
-                className="plate rounded-sm border border-rule-strong px-5 py-3 text-[11px] text-bone transition-colors duration-150 hover:bg-panel-raised"
-              >
-                {tx(HERO.secondary, lang)}
-              </Link>
-            </div>
+      {/* ── First viewport ─────────────────────────────────────────────────
+          The sentence first, the diagram second. A reader who meets the
+          schematic before they know what it is has to work out what they are
+          looking at, and most of them will not bother.
+          ------------------------------------------------------------------ */}
+      <Shell className="pb-20 pt-16 sm:pb-28 sm:pt-24">
+        <div className="rise">
+          <h1 className="display display-tight max-w-[15ch] text-[clamp(2.75rem,7.2vw,5.5rem)]">
+            {voiced(tx(HERO.h1, lang))}
+          </h1>
+          <p className="lede measure mt-8 text-[19px] text-bone-dim sm:text-[21px]">
+            {tx(HERO.sub, lang).replace("{name}", name)}
+          </p>
+          <div className="mt-10 flex flex-wrap items-center gap-3">
+            <ButtonLink
+              href={`/${lang}/workspace`}
+              prefetch={false}
+              variant="solid"
+              size="lg"
+              iconRight={ArrowRight}
+            >
+              {tx(HERO.primary, lang)}
+            </ButtonLink>
+            <ButtonLink href={`/${lang}/workflow`} variant="outline" size="lg">
+              {tx(HERO.secondary, lang)}
+            </ButtonLink>
           </div>
-
-          {/* Every scheme plan carries a key. This one doubles as the colour rule. */}
-          <aside className="lg:pt-3">
-            <h2 className="plate border-b border-rule pb-3 text-[10px] text-bone-faint">
-              {tx(HERO.keyTitle, lang)}
-            </h2>
-            <dl className="mt-4 space-y-4">
-              {(
-                [
-                  ["danger", HERO.key.danger],
-                  ["caution", HERO.key.caution],
-                  ["clear", HERO.key.clear],
-                ] as const
-              ).map(([aspect, text]) => (
-                <div key={aspect} className="flex items-start gap-3">
-                  <dt className="pt-[3px]">
-                    <Signal aspect={aspect} size="sm" />
-                    <span className="sr-only">{aspect}</span>
-                  </dt>
-                  <dd className="text-[13px] leading-snug text-bone-dim">{tx(text, lang)}</dd>
-                </div>
-              ))}
-              <div className="flex items-start gap-3">
-                <dt className="pt-[2px]">
-                  <span
-                    aria-hidden
-                    className="block h-3.5 w-[3px]"
-                    style={{
-                      backgroundImage:
-                        "repeating-linear-gradient(180deg, var(--lamp-red) 0 3px, transparent 3px 6px)",
-                    }}
-                  />
-                </dt>
-                <dd className="text-[13px] leading-snug text-bone-dim">
-                  {tx(HERO.key.boundary, lang)}
-                </dd>
-              </div>
-            </dl>
-            <p className="mt-5 border-t border-rule pt-4 text-[12px] leading-relaxed text-bone-faint">
-              {tx(HERO.keyNote, lang)}
-            </p>
-          </aside>
         </div>
+
+        <figure className="mt-16 sm:mt-20">
+          <RouteDiagram lang={lang} />
+
+          {/*
+            The figure caption carries the colour rule. It belongs under the
+            drawing it governs rather than in a legend box off to one side,
+            which is only ever read by people who already understood.
+          */}
+          <figcaption className="mt-6 grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+            {(
+              [
+                ["danger", HERO.key.danger],
+                ["caution", HERO.key.caution],
+                ["clear", HERO.key.clear],
+              ] as const
+            ).map(([aspect, text]) => (
+              <p key={aspect} className="flex items-start gap-2.5">
+                <span className="flex h-[1.55em] shrink-0 items-center">
+                  <Signal aspect={aspect} size="xs" />
+                </span>
+                <span className="text-[12.5px] leading-relaxed text-bone-faint">
+                  {tx(text, lang)}
+                </span>
+              </p>
+            ))}
+            <p className="flex items-start gap-2.5">
+              <span className="flex h-[1.55em] shrink-0 items-center">
+                <span
+                  aria-hidden
+                  className="block h-3.5 w-px shrink-0"
+                  style={{
+                    background:
+                      "repeating-linear-gradient(180deg, var(--lamp-red) 0 3px, transparent 3px 6px)",
+                  }}
+                />
+              </span>
+              <span className="text-[12.5px] leading-relaxed text-bone-faint">
+                {tx(HERO.key.boundary, lang)}
+              </span>
+            </p>
+          </figcaption>
+        </figure>
       </Shell>
 
       {/* ── The line ───────────────────────────────────────────────────────── */}
       <Section
         id="line"
         tone="deep"
+        wide
         heading={tx(SECTIONS.line.h, lang)}
         lede={tx(SECTIONS.line.p, lang)}
       >
@@ -106,150 +114,97 @@ export default async function Landing({ params }: { params: Promise<{ lang: stri
       {/* ── The interlocking table ─────────────────────────────────────────── */}
       <Section
         id="interlocking"
+        wide
         heading={tx(SECTIONS.table.h, lang)}
         lede={tx(SECTIONS.table.p, lang)}
       >
-        <div className="overflow-x-auto rounded-sm border border-rule">
-          <table className="w-full min-w-[52rem] border-collapse text-left">
-            <thead>
-              <tr className="border-b border-rule-strong bg-panel-deep">
-                <th scope="col" className="plate px-4 py-3 text-[10px] text-bone-faint">
-                  {tx(SECTIONS.table.col.route, lang)}
-                </th>
-                <th scope="col" className="plate px-4 py-3 text-[10px] text-bone-faint">
-                  {tx(SECTIONS.table.col.authority, lang)}
-                </th>
-                <th scope="col" className="plate px-4 py-3 text-[10px] text-bone-faint">
-                  {tx(SECTIONS.table.col.fail, lang)}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {ROUTES.map((r) => {
-                const boundary = r.to === "PUBLISHED_MANUALLY";
-                return (
-                  <tr
-                    key={`${r.from}-${r.to}`}
-                    className="border-b border-rule last:border-b-0 even:bg-panel-deep/40"
-                  >
-                    <th scope="row" className="whitespace-nowrap px-4 py-4 align-top font-normal">
-                      <span className="plate block text-[10px] text-bone">{r.from}</span>
-                      <span className="mt-1 flex items-center gap-1.5">
-                        <span
-                          aria-hidden
-                          className="inline-block h-[2px] w-4"
-                          style={{
-                            backgroundColor: boundary ? "transparent" : "var(--rule-strong)",
-                            backgroundImage: boundary
-                              ? "repeating-linear-gradient(90deg, var(--lamp-red) 0 3px, transparent 3px 6px)"
-                              : undefined,
-                          }}
-                        />
-                        <span className="plate text-[10px] text-bone-dim">{r.to}</span>
-                      </span>
-                    </th>
-                    <td className="px-4 py-4 align-top text-[13px] text-bone-dim">
-                      {tx(r.authority, lang)}
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <span className="flex items-start gap-2.5 text-[13px] leading-relaxed text-bone-dim">
-                        <Signal aspect={boundary ? "dark" : "danger"} size="xs" className="mt-[6px]" />
-                        <span>{tx(r.onFail, lang)}</span>
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <RouteTable lang={lang} />
       </Section>
 
       {/* ── Eight agents, one contract ─────────────────────────────────────── */}
       <Section
         id="agents"
         tone="deep"
+        wide
         heading={tx(SECTIONS.agents.h, lang)}
         lede={tx(SECTIONS.agents.p, lang)}
       >
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:gap-14">
-          <ol className="border-t border-rule">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,19rem)] lg:gap-16">
+          <ol className="-mt-2">
             {AGENTS.map((a) => (
-              <li key={a.id} className="border-b border-rule">
+              <li key={a.id} className="border-b border-rule last:border-b-0">
                 <Link
                   href={`/${lang}/agents#${a.id}`}
-                  className="group flex items-start gap-4 py-5 transition-colors duration-150 hover:bg-panel/60 sm:gap-6"
+                  className="group flex items-center gap-5 py-6 [transition:padding_260ms_var(--ease-out)] hov:pl-2"
                 >
-                  <span className="plate data w-8 shrink-0 pt-1 text-[10px] text-bone-faint">
+                  <span className="mono w-7 shrink-0 self-start pt-2 text-[11px] text-bone-faint">
                     {a.post}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="display block text-2xl font-semibold sm:text-[28px]">
+                    <span className="block text-[21px] font-medium tracking-[-0.02em] text-bone sm:text-[23px]">
                       {tx(a.name, lang)}
                     </span>
-                    <span className="mt-1.5 block text-[14px] leading-snug text-bone-dim">
+                    <span className="mt-1.5 block text-[14.5px] leading-relaxed text-bone-dim">
                       {tx(a.short, lang)}
                     </span>
                   </span>
-                  <span
+                  <ArrowUpRight
+                    className="size-4 shrink-0 self-start text-bone-faint opacity-0 [transition:opacity_200ms_var(--ease-out),transform_200ms_var(--ease-out)] group-hover:opacity-100 sm:mt-2 group-hov:-translate-y-0.5"
+                    strokeWidth={1.75}
                     aria-hidden
-                    className="mt-2 hidden h-[2px] w-8 shrink-0 bg-rule-strong transition-all duration-200 group-hover:w-12 group-hover:bg-lamp-amber sm:block"
                   />
                 </Link>
               </li>
             ))}
           </ol>
 
-          <div className="lg:sticky lg:top-24 lg:self-start">
-            <div className="rounded-sm border border-rule bg-panel p-5">
-              <h3 className="plate text-[10px] text-bone-faint">
-                {tx(SECTIONS.agents.contractTitle, lang)}
-              </h3>
-              <dl className="mt-4 space-y-2.5">
+          <aside className="lg:sticky lg:top-24 lg:self-start">
+            <div className="rounded-lg border border-rule bg-panel p-5">
+              <Label>{tx(SECTIONS.agents.contractTitle, lang)}</Label>
+              <dl className="mt-4 space-y-3">
                 {CONTRACT.map((f) => (
-                  <div key={f.field} className="flex flex-col gap-0.5">
-                    <dt className="data text-[12px] text-bone">{f.field}</dt>
-                    <dd className="text-[12px] leading-snug text-bone-faint">{tx(f.note, lang)}</dd>
+                  <div key={f.field}>
+                    <dt className="mono text-[12px] text-bone">{f.field}</dt>
+                    <dd className="mt-0.5 text-[12.5px] leading-snug text-bone-faint">
+                      {tx(f.note, lang)}
+                    </dd>
                   </div>
                 ))}
               </dl>
             </div>
-          </div>
+          </aside>
         </div>
       </Section>
 
       {/* ── The wall of reds ───────────────────────────────────────────────── */}
-      <section id="refusals" className="scroll-mt-20 border-b border-rule bg-panel-inset">
-        <div
-          aria-hidden
-          className="h-1.5 w-full"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, var(--lamp-red) 0 8px, transparent 8px 16px)",
-          }}
-        />
-        <Shell className="py-20 sm:py-28">
-          <h2 className="display max-w-[19ch] text-4xl font-semibold sm:text-5xl lg:text-6xl">
-            {tx(SECTIONS.refusals.h, lang)}
-          </h2>
-          <p className="measure mt-6 text-[15px] leading-relaxed text-bone-dim sm:text-base">
-            {tx(SECTIONS.refusals.p, lang)}
-          </p>
+      <section
+        id="refusals"
+        className="scroll-mt-24 border-y border-rule bg-panel-inset"
+      >
+        <Shell className="py-24 sm:py-32">
+          <div className="max-w-4xl">
+            <h2 className="display display-tight max-w-[17ch] text-[clamp(2.125rem,4.4vw,3.5rem)]">
+              {voiced(tx(SECTIONS.refusals.h, lang))}
+            </h2>
+            <p className="lede measure mt-6 text-[17px] text-bone-dim sm:mt-7 sm:text-[19px]">
+              {tx(SECTIONS.refusals.p, lang)}
+            </p>
+          </div>
 
-          <ul className="mt-14 grid gap-x-12 gap-y-px sm:grid-cols-2">
+          <ul className="mt-14 grid gap-x-12 sm:mt-20 sm:grid-cols-2">
             {REFUSALS.map((r) => (
-              <li key={r.post} className="flex items-start gap-4 border-t border-rule py-5">
-                <span className="flex shrink-0 flex-col items-center gap-1.5 pt-1">
-                  <Signal aspect="danger" size="md" />
-                  <span className="plate data text-[9px] leading-none text-bone-faint">
-                    {r.post}
-                  </span>
+              <li
+                key={r.post}
+                className="flex items-start gap-4 border-t border-rule py-6"
+              >
+                <span className="flex h-[1.5em] shrink-0 items-center pt-px">
+                  <Signal aspect="danger" size="sm" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[17px] font-medium leading-snug text-bone">
+                  <span className="block text-[16.5px] font-medium leading-snug tracking-[-0.01em] text-bone">
                     {tx(r.what, lang)}
                   </span>
-                  <span className="mt-1.5 block text-[13px] leading-relaxed text-bone-dim">
+                  <span className="mt-2 block text-[14px] leading-relaxed text-bone-dim">
                     {tx(r.why, lang)}
                   </span>
                 </span>
@@ -257,19 +212,12 @@ export default async function Landing({ params }: { params: Promise<{ lang: stri
             ))}
           </ul>
         </Shell>
-        <div
-          aria-hidden
-          className="h-1.5 w-full"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, var(--lamp-red) 0 8px, transparent 8px 16px)",
-          }}
-        />
       </section>
 
       {/* ── The persona ────────────────────────────────────────────────────── */}
       <Section
         id="persona"
+        wide
         heading={tx(SECTIONS.persona.h, lang)}
         lede={tx(SECTIONS.persona.p, lang)}
       >
@@ -283,19 +231,23 @@ export default async function Landing({ params }: { params: Promise<{ lang: stri
         heading={tx(SECTIONS.provenance.h, lang)}
         lede={tx(SECTIONS.provenance.p, lang)}
       >
-        <ol className="relative max-w-3xl">
+        <ol className="relative max-w-2xl">
+          {/* One continuous line behind the marks: the trail is the point. */}
           <span
             aria-hidden
-            className="absolute bottom-4 left-[7px] top-4 w-[2px]"
-            style={{ backgroundColor: "var(--rule)" }}
+            className="absolute bottom-5 left-[4.5px] top-5 w-px bg-rule-strong"
           />
           {txs(SECTIONS.provenance.chain, lang).map((step, i) => (
             <li key={step} className="relative flex items-center gap-5 py-2.5">
-              <Signal aspect="clear" size="md" className="relative z-10" />
-              <span className="plate data w-6 shrink-0 text-[10px] text-bone-faint">
+              <span className="relative z-10 rounded-full bg-panel-deep p-0.5">
+                <Signal aspect="clear" size="sm" />
+              </span>
+              <span className="mono w-6 shrink-0 text-[11px] text-bone-faint">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span className="text-[15px] text-bone-dim sm:text-base">{step}</span>
+              <span className="text-[15px] text-bone-dim sm:text-[16px]">
+                {step}
+              </span>
             </li>
           ))}
         </ol>
@@ -303,51 +255,105 @@ export default async function Landing({ params }: { params: Promise<{ lang: stri
 
       {/* ── Close ──────────────────────────────────────────────────────────── */}
       <section className="bg-panel">
-        <Shell className="py-24 sm:py-32">
-          <div
-            aria-hidden
-            className="mb-10 flex items-center gap-3"
-            title={tx(HERO.boundary, lang)}
-          >
-            <span className="h-[2px] flex-1" style={{ backgroundColor: "var(--rule-strong)" }} />
-            <span
-              className="h-10 w-[3px]"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(180deg, var(--lamp-red) 0 4px, transparent 4px 8px)",
-              }}
-            />
-            <span
-              className="h-[2px] flex-1"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(90deg, var(--rule-strong) 0 5px, transparent 5px 10px)",
-              }}
-            />
-          </div>
-          <h2 className="display max-w-[18ch] text-4xl font-semibold sm:text-5xl lg:text-6xl">
-            {tx(SECTIONS.close.h, lang)}
+        <Shell className="py-28 sm:py-36">
+          <h2 className="display display-tight max-w-[16ch] text-[clamp(2.25rem,5.4vw,4.25rem)]">
+            {voiced(tx(SECTIONS.close.h, lang))}
           </h2>
-          <p className="measure mt-6 text-[15px] leading-relaxed text-bone-dim sm:text-base">
+          <p className="lede measure mt-7 text-[18px] text-bone-dim sm:text-[20px]">
             {tx(SECTIONS.close.p, lang)}
           </p>
-          <div className="mt-9 flex flex-wrap items-center gap-3">
-            <Link
+          <div className="mt-10 flex flex-wrap items-center gap-3">
+            <ButtonLink
               href={`/${lang}/workspace`}
-                prefetch={false}
-              className="plate rounded-sm bg-bone px-5 py-3 text-[11px] text-panel-deep transition-colors duration-150 hover:bg-lamp-amber"
+              prefetch={false}
+              variant="solid"
+              size="lg"
+              iconRight={ArrowRight}
             >
               {tx(HERO.primary, lang)}
-            </Link>
-            <Link
-              href={`/${lang}/security`}
-              className="plate rounded-sm border border-rule-strong px-5 py-3 text-[11px] text-bone transition-colors duration-150 hover:bg-panel-raised"
-            >
+            </ButtonLink>
+            <ButtonLink href={`/${lang}/security`} variant="outline" size="lg">
               {lang === "zh" ? "看审计与权限" : "See the audit rules"}
-            </Link>
+            </ButtonLink>
           </div>
         </Shell>
       </section>
     </>
+  );
+}
+
+/**
+ * The interlocking, as a table.
+ *
+ * Rows are read left to right: the move, who may call it, and what happens
+ * when a condition will not prove. The last column is the interesting one, so
+ * it gets the width and the state mark; the first is an identifier, so it is
+ * set in mono and stays narrow.
+ */
+function RouteTable({ lang }: { lang: Lang }) {
+  const head = "px-5 py-3 text-left align-bottom";
+  return (
+    <div className="overflow-x-auto rounded-lg border border-rule">
+      <table className="w-full min-w-[54rem] border-collapse">
+        <thead>
+          <tr className="border-b border-rule bg-panel-deep">
+            <th scope="col" className={head}>
+              <Label>{tx(SECTIONS.table.col.route, lang)}</Label>
+            </th>
+            <th scope="col" className={head}>
+              <Label>{tx(SECTIONS.table.col.authority, lang)}</Label>
+            </th>
+            <th scope="col" className={head}>
+              <Label>{tx(SECTIONS.table.col.fail, lang)}</Label>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {ROUTES.map((r) => {
+            const boundary = r.to === "PUBLISHED_MANUALLY";
+            return (
+              <tr
+                key={`${r.from}-${r.to}`}
+                className="border-b border-rule last:border-b-0"
+              >
+                <th
+                  scope="row"
+                  className="whitespace-nowrap px-5 py-5 text-left align-top font-normal"
+                >
+                  <span className="mono block text-[12px] text-bone">
+                    {r.from}
+                  </span>
+                  <span className="mt-1.5 flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="inline-block h-px w-4 shrink-0"
+                      style={{
+                        background: boundary
+                          ? "repeating-linear-gradient(90deg, var(--lamp-red) 0 3px, transparent 3px 6px)"
+                          : "var(--rule-strong)",
+                      }}
+                    />
+                    <span className="mono text-[12px] text-bone-dim">
+                      {r.to}
+                    </span>
+                  </span>
+                </th>
+                <td className="px-5 py-5 align-top text-[13.5px] leading-relaxed text-bone-dim">
+                  {tx(r.authority, lang)}
+                </td>
+                <td className="px-5 py-5 align-top">
+                  <span className="flex items-start gap-3 text-[13.5px] leading-relaxed text-bone-dim">
+                    <span className="flex h-[1.6em] shrink-0 items-center">
+                      <Signal aspect={boundary ? "dark" : "danger"} size="xs" />
+                    </span>
+                    <span>{tx(r.onFail, lang)}</span>
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

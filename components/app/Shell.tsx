@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import { ChevronDown, ChevronsUpDown, Plus } from "lucide-react";
+import { Mark } from "@/components/SiteHeader";
 import { clsx } from "@/lib/clsx";
 
 /*
@@ -51,28 +52,55 @@ export function Rail({
         className="row mx-2 mt-2 flex items-center gap-2.5 px-2 py-2 text-left"
         onClick={onClose}
       >
+        {/*
+          A neutral tile carrying the product mark. This used to be a blue
+          gradient, which made it the only saturated colour in the interface
+          that was not reporting a state.
+        */}
         <span
           aria-hidden
-          className="h-8 w-8 shrink-0 rounded-[var(--r)]"
-          style={{ background: "linear-gradient(140deg, #4aa3df 0%, #2f7fb8 45%, #6fd0c8 100%)" }}
-        />
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)]"
+          style={{
+            background: "var(--surface-gray-3)",
+            color: "var(--ink-gray-8)",
+          }}
+        >
+          <Mark className="h-[18px] w-[18px]" />
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-semibold leading-tight" style={{ color: "var(--ink-gray-9)" }}>
+          <span
+            className="block truncate text-[15px] font-semibold leading-tight"
+            style={{ color: "var(--ink-gray-9)" }}
+          >
             {workspace}
           </span>
-          <span className="block truncate text-[12.5px] leading-tight" style={{ color: "var(--ink-gray-4)" }}>
+          <span
+            className="block truncate text-[12.5px] leading-tight"
+            style={{ color: "var(--ink-gray-4)" }}
+          >
             {subtitle}
           </span>
         </span>
-        <ChevronsUpDown className="h-4 w-4 shrink-0" strokeWidth={1.75} style={{ color: "var(--ink-gray-4)" }} aria-hidden />
+        <ChevronsUpDown
+          className="h-4 w-4 shrink-0"
+          strokeWidth={1.75}
+          style={{ color: "var(--ink-gray-4)" }}
+          aria-hidden
+        />
       </button>
 
-      <nav aria-label="Sections" className="mt-2 flex-1 overflow-y-auto px-2 pb-3">
+      <nav
+        aria-label="Sections"
+        className="mt-2 flex-1 overflow-y-auto px-2 pb-3"
+      >
         {groups.map((g, gi) => (
           <div key={g.label ?? gi} className={gi ? "mt-5" : ""}>
             {g.label ? (
               <div className="flex items-center justify-between px-2 pb-1">
-                <span className="text-[13px]" style={{ color: "var(--ink-gray-4)" }}>
+                <span
+                  className="text-[13px]"
+                  style={{ color: "var(--ink-gray-4)" }}
+                >
                   {g.label}
                 </span>
                 {g.action ? (
@@ -81,9 +109,13 @@ export function Rail({
                     onClick={g.action.onClick}
                     title={g.action.title}
                     aria-label={g.action.title}
-                    className="rounded-[var(--r-sm)] p-0.5 [transition:background-color_120ms_var(--e-out)] [@media(hover:hover)and(pointer:fine)]:hover:bg-[var(--row-hover)]"
+                    className="rounded-[var(--r-sm)] p-0.5 [transition:background-color_120ms_var(--e-out)] hov:bg-[var(--row-hover)]"
                   >
-                    <g.action.icon className="h-4 w-4" strokeWidth={1.75} style={{ color: "var(--ink-gray-4)" }} />
+                    <g.action.icon
+                      className="h-4 w-4"
+                      strokeWidth={1.75}
+                      style={{ color: "var(--ink-gray-4)" }}
+                    />
                   </button>
                 ) : null}
               </div>
@@ -103,17 +135,24 @@ export function Rail({
                       <item.icon
                         className="h-[17px] w-[17px] shrink-0"
                         strokeWidth={1.75}
-                        style={{ color: on ? "var(--ink-gray-9)" : "var(--ink-gray-4)" }}
+                        style={{
+                          color: on ? "var(--ink-gray-9)" : "var(--ink-gray-4)",
+                        }}
                         aria-hidden
                       />
                       <span
                         className="min-w-0 flex-1 truncate text-[14.5px]"
-                        style={{ color: on ? "var(--ink-gray-9)" : "var(--ink-gray-6)" }}
+                        style={{
+                          color: on ? "var(--ink-gray-9)" : "var(--ink-gray-6)",
+                        }}
                       >
                         {item.label}
                       </span>
                       {item.count ? (
-                        <span className="text-[13px] tabular-nums" style={{ color: "var(--ink-gray-4)" }}>
+                        <span
+                          className="text-[13px] tabular-nums"
+                          style={{ color: "var(--ink-gray-4)" }}
+                        >
                           {item.count}
                         </span>
                       ) : null}
@@ -132,10 +171,19 @@ export function Rail({
 }
 
 /** Page title row: name on the left, the one primary action on the right. */
-export function DeskHeader({ title, action }: { title: string; action?: React.ReactNode }) {
+export function DeskHeader({
+  title,
+  action,
+}: {
+  title: string;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="flex items-center gap-4 px-6 pt-5">
-      <h1 className="min-w-0 flex-1 truncate text-[22px] font-medium tracking-[-0.01em]" style={{ color: "var(--ink-gray-9)" }}>
+      <h1
+        className="min-w-0 flex-1 truncate text-[22px] font-medium tracking-[-0.01em]"
+        style={{ color: "var(--ink-gray-9)" }}
+      >
         {title}
       </h1>
       {action}
@@ -160,7 +208,10 @@ export function DeskToolbar({
   return (
     <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-6 py-4">
       {segments?.length ? (
-        <div className="mr-2 flex items-center rounded-[var(--r)] p-[3px]" style={{ background: "var(--row-hover)" }}>
+        <div
+          className="mr-2 flex items-center rounded-[var(--r)] p-[3px]"
+          style={{ background: "var(--row-hover)" }}
+        >
           {segments.map((s) => {
             const on = s === activeSegment;
             return (
@@ -186,7 +237,7 @@ export function DeskToolbar({
           key={f.label}
           type="button"
           onClick={f.onClick}
-          className="flex items-center gap-1 rounded-[var(--r-sm)] px-2.5 py-1.5 text-[14px] [transition:background-color_120ms_var(--e-out)] [@media(hover:hover)and(pointer:fine)]:hover:bg-[var(--row-hover)]"
+          className="flex items-center gap-1 rounded-[var(--r-sm)] px-2.5 py-1.5 text-[14px] [transition:background-color_120ms_var(--e-out)] hov:bg-[var(--row-hover)]"
           style={{ color: "var(--ink-gray-5)" }}
         >
           {f.label}
@@ -194,19 +245,33 @@ export function DeskToolbar({
         </button>
       ))}
 
-      {right ? <div className="ml-auto flex items-center gap-3">{right}</div> : null}
+      {right ? (
+        <div className="ml-auto flex items-center gap-3">{right}</div>
+      ) : null}
     </div>
   );
 }
 
-export function GroupHeading({ label, count }: { label: string; count?: number }) {
+export function GroupHeading({
+  label,
+  count,
+}: {
+  label: string;
+  count?: number;
+}) {
   return (
     <div className="flex items-center gap-2 px-3 pb-1 pt-5 first:pt-0">
-      <h2 className="text-[15px] font-medium" style={{ color: "var(--ink-gray-9)" }}>
+      <h2
+        className="text-[15px] font-medium"
+        style={{ color: "var(--ink-gray-9)" }}
+      >
         {label}
       </h2>
       {count != null ? (
-        <span className="text-[14px] tabular-nums" style={{ color: "var(--ink-gray-4)" }}>
+        <span
+          className="text-[14px] tabular-nums"
+          style={{ color: "var(--ink-gray-4)" }}
+        >
           {count}
         </span>
       ) : null}
@@ -225,7 +290,10 @@ export function Row({
   active?: boolean;
 }) {
   const body = (
-    <div className="row flex w-full items-center gap-3 px-3 py-[11px] text-left" data-active={active ? "true" : undefined}>
+    <div
+      className="row flex w-full items-center gap-3 px-3 py-[11px] text-left"
+      data-active={active ? "true" : undefined}
+    >
       {children}
     </div>
   );
@@ -238,10 +306,18 @@ export function Row({
   );
 }
 
-export function Chip({ color, children }: { color?: string; children: React.ReactNode }) {
+export function Chip({
+  color,
+  children,
+}: {
+  color?: string;
+  children: React.ReactNode;
+}) {
   return (
     <span className="chip">
-      {color ? <span className="chip-dot" style={{ background: color }} aria-hidden /> : null}
+      {color ? (
+        <span className="chip-dot" style={{ background: color }} aria-hidden />
+      ) : null}
       {children}
     </span>
   );
@@ -279,11 +355,15 @@ export function PrimaryAction({
         "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[var(--r)] pl-3 pr-4 text-[14.5px] font-medium",
         "[transition:opacity_140ms_var(--e-out),transform_120ms_var(--e-out)]",
         "active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100",
-        "[@media(hover:hover)and(pointer:fine)]:hover:opacity-90",
+        "hov:opacity-90",
       )}
       style={{ background: "var(--surface-gray-7)", color: "var(--ink-white)" }}
     >
-      <Icon className={clsx("h-4 w-4", loading && "animate-spin")} strokeWidth={2} aria-hidden />
+      <Icon
+        className={clsx("h-4 w-4", loading && "animate-spin")}
+        strokeWidth={2}
+        aria-hidden
+      />
       {children}
     </button>
   );

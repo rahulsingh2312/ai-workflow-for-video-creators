@@ -6,6 +6,8 @@ import { LANGS, isLang, tx, txs, type Lang } from "@/lib/i18n";
 import { PageHeader } from "@/components/PageHeader";
 import { Shell } from "@/components/Section";
 import { Signal } from "@/components/Signal";
+import { Label } from "@/components/Kit";
+import { plain, voiced } from "@/components/Voice";
 
 export function generateStaticParams() {
   return LANGS.map((lang) => ({ lang }));
@@ -17,10 +19,16 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { title: tx(PAGES.workflow.title, lang === "zh" ? "zh" : "en") };
+  return {
+    title: plain(tx(PAGES.workflow.title, lang === "zh" ? "zh" : "en")),
+  };
 }
 
-export default async function WorkflowPage({ params }: { params: Promise<{ lang: string }> }) {
+export default async function WorkflowPage({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}) {
   const { lang: raw } = await params;
   if (!isLang(raw)) notFound();
   const lang = raw as Lang;
@@ -28,68 +36,85 @@ export default async function WorkflowPage({ params }: { params: Promise<{ lang:
   return (
     <>
       <PageHeader
-        post="SHEET 1 OF 4"
         h1={tx(PAGES.workflow.h1, lang)}
         lede={tx(PAGES.workflow.lede, lang)}
       />
 
-      {/* Every block, in full. */}
-      <Shell className="py-16 sm:py-20">
-        <ol className="border-t border-rule">
+      {/* ── Every block, in full ─────────────────────────────────────────────
+          Two columns: what the state is on the left, what it has to prove and
+          who owns it on the right. The left column keeps a fixed width down
+          the whole list so the eye can run straight down the state names
+          without re-finding the left edge on every row.
+          -------------------------------------------------------------------- */}
+      <Shell className="py-16 sm:py-24">
+        <ol>
           {STATES.map((state) => (
             <li
               key={state.code}
               id={state.code}
-              className="scroll-mt-24 border-b border-rule py-10 sm:py-12"
+              className="scroll-mt-24 border-b border-rule py-12 first:border-t sm:py-14"
             >
-              <div className="grid gap-8 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:gap-14">
+              <div className="grid gap-9 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] lg:gap-16">
                 <div>
-                  <div className="flex items-center gap-3">
-                    <Signal aspect={state.beyondAuthority ? "dark" : "clear"} size="md" />
-                    <span className="plate data text-[10px] text-bone-faint">{state.post}</span>
+                  <div className="flex items-center gap-2.5">
+                    <Signal
+                      aspect={state.beyondAuthority ? "dark" : "clear"}
+                      size="sm"
+                    />
+                    <span className="mono text-[11.5px] text-bone-faint">
+                      {state.post}
+                    </span>
                     {state.beyondAuthority ? (
-                      <span className="plate text-[9px] text-fg-red">
+                      <span className="plate text-fg-red">
                         {lang === "zh" ? "边界之外" : "Beyond the boundary"}
                       </span>
                     ) : null}
                   </div>
-                  <h2 className="display mt-4 text-3xl font-semibold sm:text-4xl">
+                  <h2 className="display mt-4 text-[clamp(1.75rem,3vw,2.375rem)]">
                     {tx(state.name, lang)}
                   </h2>
-                  <p className="plate mt-2 text-[10px] text-bone-dim">{state.code}</p>
-                  <p className="mt-4 text-[14px] leading-relaxed text-bone-dim">
+                  <p className="mono mt-2 text-[12px] text-bone-faint">
+                    {state.code}
+                  </p>
+                  <p className="lede mt-5 max-w-[46ch] text-[16px] text-bone-dim">
                     {tx(state.meaning, lang)}
                   </p>
                 </div>
 
-                <div className="grid gap-8 sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)]">
+                <div className="grid gap-9 sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)] sm:gap-10">
                   <div>
-                    <h3 className="plate text-[10px] text-bone-faint">
-                      {tx(COMMON.conditions, lang)}
-                    </h3>
-                    <ul className="mt-3 space-y-2.5">
+                    <Label>{tx(COMMON.conditions, lang)}</Label>
+                    <ul className="mt-3.5 space-y-2.5">
                       {txs(state.conditions, lang).map((c) => (
-                        <li key={c} className="flex items-start gap-2.5 text-[14px] leading-snug">
-                          <Signal
-                            aspect={state.beyondAuthority ? "dark" : "clear"}
-                            size="xs"
-                            className="mt-[7px]"
-                          />
+                        <li
+                          key={c}
+                          className="flex items-start gap-3 text-[14.5px] leading-relaxed"
+                        >
+                          <span className="flex h-[1.6em] shrink-0 items-center">
+                            <Signal
+                              aspect={state.beyondAuthority ? "dark" : "clear"}
+                              size="xs"
+                            />
+                          </span>
                           <span className="text-bone-dim">{c}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
-                  <dl className="space-y-5 border-t border-rule pt-5 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+                  <dl className="space-y-6 border-t border-rule pt-6 sm:border-l sm:border-t-0 sm:pl-8 sm:pt-0">
                     <div>
-                      <dt className="plate text-[10px] text-bone-faint">{tx(COMMON.role, lang)}</dt>
-                      <dd className="mt-1.5 text-[14px] text-bone">{tx(state.role, lang)}</dd>
+                      <dt>
+                        <Label>{tx(COMMON.role, lang)}</Label>
+                      </dt>
+                      <dd className="mt-2 text-[14.5px] text-bone">
+                        {tx(state.role, lang)}
+                      </dd>
                     </div>
                     <div>
-                      <dt className="plate text-[10px] text-bone-faint">
-                        {tx(COMMON.produces, lang)}
+                      <dt>
+                        <Label>{tx(COMMON.produces, lang)}</Label>
                       </dt>
-                      <dd className="mt-1.5 text-[13px] leading-snug text-bone-dim">
+                      <dd className="mt-2 text-[13.5px] leading-relaxed text-bone-dim">
                         {tx(state.produces, lang)}
                       </dd>
                     </div>
@@ -101,24 +126,24 @@ export default async function WorkflowPage({ params }: { params: Promise<{ lang:
         </ol>
       </Shell>
 
-      {/* The interlocking table again, in full, because this is the page for it. */}
+      {/* ── The interlocking, in full ────────────────────────────────────── */}
       <section className="border-y border-rule bg-panel-deep">
-        <Shell className="py-16 sm:py-20">
-          <h2 className="display max-w-[19ch] text-3xl font-semibold sm:text-4xl lg:text-5xl">
-            {tx(SECTIONS.table.h, lang)}
+        <Shell className="py-20 sm:py-28">
+          <h2 className="display display-tight max-w-[17ch] text-[clamp(2rem,4vw,3rem)]">
+            {voiced(tx(SECTIONS.table.h, lang))}
           </h2>
-          <div className="mt-10 overflow-x-auto rounded-sm border border-rule">
-            <table className="w-full min-w-[52rem] border-collapse text-left">
+          <div className="mt-12 overflow-x-auto rounded-lg border border-rule">
+            <table className="w-full min-w-[54rem] border-collapse">
               <thead>
-                <tr className="border-b border-rule-strong bg-panel">
-                  <th scope="col" className="plate px-4 py-3 text-[10px] text-bone-faint">
-                    {tx(SECTIONS.table.col.route, lang)}
+                <tr className="border-b border-rule bg-panel">
+                  <th scope="col" className="px-5 py-3 text-left align-bottom">
+                    <Label>{tx(SECTIONS.table.col.route, lang)}</Label>
                   </th>
-                  <th scope="col" className="plate px-4 py-3 text-[10px] text-bone-faint">
-                    {tx(SECTIONS.table.col.authority, lang)}
+                  <th scope="col" className="px-5 py-3 text-left align-bottom">
+                    <Label>{tx(SECTIONS.table.col.authority, lang)}</Label>
                   </th>
-                  <th scope="col" className="plate px-4 py-3 text-[10px] text-bone-faint">
-                    {tx(SECTIONS.table.col.fail, lang)}
+                  <th scope="col" className="px-5 py-3 text-left align-bottom">
+                    <Label>{tx(SECTIONS.table.col.fail, lang)}</Label>
                   </th>
                 </tr>
               </thead>
@@ -126,33 +151,43 @@ export default async function WorkflowPage({ params }: { params: Promise<{ lang:
                 {ROUTES.map((r) => {
                   const boundary = r.to === "PUBLISHED_MANUALLY";
                   return (
-                    <tr key={`${r.from}-${r.to}`} className="border-b border-rule last:border-b-0">
-                      <th scope="row" className="whitespace-nowrap px-4 py-4 align-top font-normal">
-                        <span className="plate block text-[10px] text-bone">{r.from}</span>
-                        <span className="mt-1 flex items-center gap-1.5">
+                    <tr
+                      key={`${r.from}-${r.to}`}
+                      className="border-b border-rule last:border-b-0"
+                    >
+                      <th
+                        scope="row"
+                        className="whitespace-nowrap px-5 py-5 text-left align-top font-normal"
+                      >
+                        <span className="mono block text-[12px] text-bone">
+                          {r.from}
+                        </span>
+                        <span className="mt-1.5 flex items-center gap-2">
                           <span
                             aria-hidden
-                            className="inline-block h-[2px] w-4"
+                            className="inline-block h-px w-4 shrink-0"
                             style={{
-                              backgroundColor: boundary ? "transparent" : "var(--rule-strong)",
-                              backgroundImage: boundary
+                              background: boundary
                                 ? "repeating-linear-gradient(90deg, var(--lamp-red) 0 3px, transparent 3px 6px)"
-                                : undefined,
+                                : "var(--rule-strong)",
                             }}
                           />
-                          <span className="plate text-[10px] text-bone-dim">{r.to}</span>
+                          <span className="mono text-[12px] text-bone-dim">
+                            {r.to}
+                          </span>
                         </span>
                       </th>
-                      <td className="px-4 py-4 align-top text-[13px] text-bone-dim">
+                      <td className="px-5 py-5 align-top text-[13.5px] leading-relaxed text-bone-dim">
                         {tx(r.authority, lang)}
                       </td>
-                      <td className="px-4 py-4 align-top">
-                        <span className="flex items-start gap-2.5 text-[13px] leading-relaxed text-bone-dim">
-                          <Signal
-                            aspect={boundary ? "dark" : "danger"}
-                            size="xs"
-                            className="mt-[6px]"
-                          />
+                      <td className="px-5 py-5 align-top">
+                        <span className="flex items-start gap-3 text-[13.5px] leading-relaxed text-bone-dim">
+                          <span className="flex h-[1.6em] shrink-0 items-center">
+                            <Signal
+                              aspect={boundary ? "dark" : "danger"}
+                              size="xs"
+                            />
+                          </span>
                           <span>{tx(r.onFail, lang)}</span>
                         </span>
                       </td>
@@ -165,27 +200,31 @@ export default async function WorkflowPage({ params }: { params: Promise<{ lang:
         </Shell>
       </section>
 
-      {/* Clearances that get taken back. */}
-      <Shell className="py-16 sm:py-24">
-        <h2 className="display max-w-[19ch] text-3xl font-semibold sm:text-4xl lg:text-5xl">
-          {tx(PAGES.workflow.invalidationH, lang)}
+      {/* ── Clearances that get taken back ──────────────────────────────── */}
+      <Shell className="py-20 sm:py-28">
+        <h2 className="display display-tight max-w-[17ch] text-[clamp(2rem,4vw,3rem)]">
+          {voiced(tx(PAGES.workflow.invalidationH, lang))}
         </h2>
-        <p className="measure mt-6 text-[15px] leading-relaxed text-bone-dim">
+        <p className="lede measure mt-7 text-[17px] text-bone-dim sm:text-[19px]">
           {tx(PAGES.workflow.invalidationP, lang)}
         </p>
-        <dl className="mt-12 border-t border-rule">
+        <dl className="mt-14">
           {INVALIDATIONS.map((rule) => (
             <div
               key={rule.trigger.en}
-              className="grid gap-3 border-b border-rule py-6 sm:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] sm:gap-10"
+              className="grid gap-3 border-t border-rule py-7 last:border-b sm:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] sm:gap-12"
             >
               <dt className="flex items-start gap-3">
-                <Signal aspect="danger" size="sm" className="mt-[5px]" />
-                <span className="text-[15px] font-medium leading-snug text-bone">
+                <span className="flex h-[1.5em] shrink-0 items-center">
+                  <Signal aspect="danger" size="sm" />
+                </span>
+                <span className="text-[15.5px] font-medium leading-snug tracking-[-0.01em] text-bone">
                   {tx(rule.trigger, lang)}
                 </span>
               </dt>
-              <dd className="text-[14px] leading-relaxed text-bone-dim">{tx(rule.effect, lang)}</dd>
+              <dd className="text-[14.5px] leading-relaxed text-bone-dim">
+                {tx(rule.effect, lang)}
+              </dd>
             </div>
           ))}
         </dl>

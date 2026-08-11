@@ -5,9 +5,13 @@ import { usePathname } from "next/navigation";
 import { clsx } from "@/lib/clsx";
 
 /**
- * A route indicator. The active link lights its lamp; the others sit dark on
- * the plate. Nothing here moves on hover except colour, because a signage
- * plate that jumps when you look at it is a broken signage plate.
+ * A nav item.
+ *
+ * The active one is filled and the rest are not, which is the whole signal.
+ * There is no indicator dot: a header that lights four lamps to tell you
+ * which of four links you are on has spent colour on something the type was
+ * already saying. Nothing moves on hover, only the ground under it, because a
+ * link that shifts as the cursor arrives is a link that is harder to hit.
  */
 export function NavLink({
   href,
@@ -28,25 +32,13 @@ export function NavLink({
       prefetch={prefetch}
       aria-current={active ? "page" : undefined}
       className={clsx(
-        "plate group relative flex items-center gap-2 whitespace-nowrap rounded-sm px-2.5 py-1.5 text-[11px] transition-colors duration-150",
-        active ? "text-bone" : "text-bone-dim hover:text-bone",
+        "flex h-8 items-center whitespace-nowrap rounded-md px-3 text-[13.5px]",
+        "[transition:background-color_160ms_var(--ease-out),color_160ms_var(--ease-out)]",
+        active
+          ? "bg-panel-raised font-medium text-bone"
+          : "text-bone-dim hov:bg-panel-raised hov:text-bone",
       )}
     >
-      <span
-        aria-hidden
-        className={clsx(
-          "lamp inline-block h-1.5 w-1.5 rounded-full",
-          !active && "group-hover:opacity-70",
-        )}
-        style={
-          active
-            ? {
-                backgroundColor: "var(--lamp-green)",
-                boxShadow: "0 0 8px 1px var(--halo-green)",
-              }
-            : { backgroundColor: "var(--rule-strong)" }
-        }
-      />
       {children}
     </Link>
   );

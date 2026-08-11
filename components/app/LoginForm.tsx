@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import type { Lang } from "@/lib/i18n";
 import { brand } from "@/lib/brand";
 import { Badge, Button, Field, Input } from "@/components/app/kit";
+import { Mark } from "@/components/SiteHeader";
 
 const ACCOUNTS: {
   email: string;
@@ -102,19 +103,19 @@ export function LoginForm({ lang }: { lang: Lang }) {
         {/* Sign in */}
         <div className="order-2 lg:order-1">
           <span
-            className="flex h-11 w-11 items-center justify-center rounded-[var(--r)] text-[16px] font-bold"
-            style={{
-              background: "var(--surface-gray-7)",
-              color: "var(--ink-white)",
-            }}
+            className="inline-flex items-center gap-[7px]"
+            style={{ color: "var(--ink-gray-9)" }}
           >
-            {zh ? "主" : "T"}
+            <Mark className="size-5" />
+            <span className="text-[17px] font-medium tracking-[-0.02em]">
+              {zh ? brand.nameZh : brand.nameEn}
+            </span>
           </span>
-          <h1 className="mt-6 text-[30px] font-semibold leading-tight">
+          <h1 className="mt-8 text-[32px] font-medium leading-[1.1] tracking-[-0.03em]">
             {t("Welcome back", "欢迎回来")}
           </h1>
           <p
-            className="mt-2 text-[15px] leading-relaxed"
+            className="mt-3 text-[15px] leading-relaxed"
             style={{ color: "var(--ink-gray-6)" }}
           >
             {t(
@@ -162,7 +163,7 @@ export function LoginForm({ lang }: { lang: Lang }) {
               size="lg"
               full
               loading={busy}
-              icon={ArrowRight}
+              iconRight={ArrowRight}
             >
               {t("Sign in", "登录")}
             </Button>
@@ -183,9 +184,8 @@ export function LoginForm({ lang }: { lang: Lang }) {
           <div
             className="rounded-[var(--r)] p-5"
             style={{
-              background: "var(--surface-white)",
-              border: "1px solid var(--outline-gray-1)",
-              boxShadow: "var(--sh-md)",
+              background: "var(--surface-cards)",
+              border: "1px solid var(--outline-gray-2)",
             }}
           >
             <div className="flex items-center gap-2">
@@ -216,7 +216,7 @@ export function LoginForm({ lang }: { lang: Lang }) {
                         setPassword("throughline");
                         setError(null);
                       }}
-                      className="flex w-full items-center gap-3 rounded-[var(--r-sm)] px-3 py-2.5 text-left transition-colors duration-150"
+                      className="press flex w-full items-center gap-3 rounded-[var(--r)] px-3 py-2.5 text-left [transition:background-color_140ms_var(--e-out),border-color_140ms_var(--e-out)]"
                       style={{
                         background: active
                           ? "var(--surface-gray-2)"

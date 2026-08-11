@@ -11,8 +11,8 @@ export const NAV: { href: string; label: L }[] = [
 
 export const HERO = {
   h1: {
-    en: "Nothing moves until the evidence clears.",
-    zh: "证据不清，一步都动不了。",
+    en: "Nothing moves until the *evidence* clears.",
+    zh: "证据不清，*一步都动不了*。",
   },
   sub: {
     en: "{name} carries a topic to a locked, fact-checked script, hands that script to your video team, and lays out everything your operator needs to publish by hand. It has no publish button. That part is on purpose.",
@@ -42,8 +42,14 @@ export const HERO = {
       en: "At danger. A condition will not prove, and the task holds where it is.",
       zh: "禁止。有条件不成立，任务停在原地。",
     },
-    caution: { en: "Proving. Conditions are being checked right now.", zh: "校验中。正在逐条检查条件。" },
-    clear: { en: "Cleared. Every condition proved, and a person signed where one was required.", zh: "放行。条件全部成立，需要签字的地方有人签了。" },
+    caution: {
+      en: "Proving. Conditions are being checked right now.",
+      zh: "校验中。正在逐条检查条件。",
+    },
+    clear: {
+      en: "Cleared. Every condition proved, and a person signed where one was required.",
+      zh: "放行。条件全部成立，需要签字的地方有人签了。",
+    },
     boundary: {
       en: "Boundary. Track beyond this marker belongs to a person, not to this product.",
       zh: "边界。这个标记之外的线路属于人，不属于这个产品。",
@@ -57,14 +63,20 @@ export const HERO = {
 
 export const SECTIONS = {
   line: {
-    h: { en: "Eleven blocks, and you cannot skip one.", zh: "十一个闭塞区间，一个都跳不过去。" },
+    h: {
+      en: "Eleven blocks, and you *cannot* skip one.",
+      zh: "十一个闭塞区间，*一个都跳不过去*。",
+    },
     p: {
       en: "Every content task sits in exactly one block at a time. The state names are not decoration: they are the same eleven strings the workflow service, the database, and the audit log all agree on. Pick a block to see what has to prove before the signal ahead of it clears.",
       zh: "任何内容任务在同一时刻只处在一个区间里。这些状态名不是装饰：工作流服务、数据库和审计日志用的是同样这十一个字符串。点开任一区间，看看前方信号放行前必须先证明什么。",
     },
   },
   table: {
-    h: { en: "What has to prove before a signal clears", zh: "信号放行前，必须证明什么" },
+    h: {
+      en: "What has to *prove* before a signal clears",
+      zh: "信号放行前，必须*证明*什么",
+    },
     p: {
       en: "A signalling interlocking is a table of routes and the conditions each one requires. Read a row left to right: the move, who is allowed to call it, and what happens when a condition will not prove. The interesting column is the last one.",
       zh: "联锁本质上是一张表：有哪些进路，每条进路要满足什么条件。一行从左往右读：这一步是什么、谁有权排这条进路、条件不成立时会怎样。最值得看的是最后一列。",
@@ -76,7 +88,10 @@ export const SECTIONS = {
     },
   },
   agents: {
-    h: { en: "Eight agents, one output contract", zh: "八个智能体，一份输出契约" },
+    h: {
+      en: "Eight agents, *one* output contract",
+      zh: "八个智能体，*一份*输出契约",
+    },
     p: {
       en: "Each agent sits behind the same input and output interface, which is the whole reason you can swap a model or a tool without rewriting the workflow around it. Every one of them returns these twelve fields, every time, including when it fails.",
       zh: "每个智能体都在同一套输入输出接口后面，这正是你能换模型、换工具而不必重写整条工作流的原因。它们每一次都返回下面这十二个字段，失败时也一样。",
@@ -85,14 +100,17 @@ export const SECTIONS = {
     more: { en: "Full module detail", zh: "完整模块说明" },
   },
   refusals: {
-    h: { en: "Signals that never clear", zh: "永远不会放行的信号" },
+    h: { en: "Signals that *never* clear", zh: "*永远*不会放行的信号" },
     p: {
       en: "These are not gaps in the build. They are decisions, and they are the reason the rest of it can be trusted. Nine reds, fixed.",
       zh: "这些不是没做完的部分，而是决定，也正是其余部分值得信任的原因。九个红灯，固定不变。",
     },
   },
   persona: {
-    h: { en: "It answers what it can prove, and hands over the rest", zh: "能证明的它就答，剩下的交给人" },
+    h: {
+      en: "It answers what it can *prove*, and hands over the rest",
+      zh: "能证明的它就答，*剩下的交给人*",
+    },
     p: {
       en: "Inside Enterprise WeChat, through official APIs and approved callbacks only. Every answer carries the internal passages it was built from and a confidence score, and the mode it picks is visible to you before anything is sent.",
       zh: "在企业微信里，只走官方 API 和已批准的回调。每条回答都带着它所依据的内部段落和置信度，它选了哪种模式，在发出之前你就看得到。",
@@ -117,7 +135,7 @@ export const SECTIONS = {
     },
   },
   provenance: {
-    h: { en: "Every sentence has a paper trail", zh: "每句话都留得下痕迹" },
+    h: { en: "Every sentence has a *paper trail*", zh: "每句话都*留得下痕迹*" },
     p: {
       en: "Pick any line in a published video and you can walk backwards: the claim, the source it came from, the reviewer who accepted it, the version that got locked, the video bound to that version, the package built from the pair, the account and time it was published under, and the metrics that came back.",
       zh: "从已发布视频里随便挑一句话，你都能倒着走回去：这条主张、它来自哪个来源、谁审过、锁的是哪个版本、绑定这个版本的成片、依据这一对生成的物料包、用哪个账号什么时候发的、以及回来的数据。",
@@ -146,7 +164,10 @@ export const SECTIONS = {
     } satisfies LL,
   },
   close: {
-    h: { en: "The line ends here. A person takes it from the boundary.", zh: "线路到此为止。边界之后，交给人。" },
+    h: {
+      en: "The line ends here. A *person* takes it from the boundary.",
+      zh: "线路到此为止。边界之后，*交给人*。",
+    },
     p: {
       en: "That is the entire pitch. Everything upstream of the boundary is versioned, sourced, and signed for. Everything past it belongs to someone with a name.",
       zh: "整个主张就这么多。边界以前的每一步都有版本、有来源、有人签字。边界以后，属于一个有名有姓的人。",
@@ -157,12 +178,15 @@ export const SECTIONS = {
 export const PAGES = {
   workflow: {
     title: { en: "The line", zh: "线路" },
-    h1: { en: "The line, block by block", zh: "线路：逐区间说明" },
+    h1: { en: "The line, *block by block*", zh: "线路：*逐区间*说明" },
     lede: {
       en: "Eleven states, ten routes between them, and the conditions each route needs before its signal will clear. Below that, the five rules that revoke a clearance once it has been given.",
       zh: "十一个状态、十条进路，以及每条进路放行前需要满足的条件。再往下是五条规则，它们会把已经给出的放行收回去。",
     },
-    invalidationH: { en: "Clearances that get revoked", zh: "会被收回的放行" },
+    invalidationH: {
+      en: "Clearances that get *revoked*",
+      zh: "会被*收回*的放行",
+    },
     invalidationP: {
       en: "An interlocking is not a checklist, because a checklist only ever moves forward. Clearing one condition re-proves every route that depended on it, and breaking one takes those routes back.",
       zh: "联锁不是清单，因为清单只会往前走。满足一个条件，会重新验证所有依赖它的进路；破坏一个条件，那些进路也就一并收回。",
@@ -172,7 +196,7 @@ export const PAGES = {
   },
   agents: {
     title: { en: "Agents", zh: "智能体" },
-    h1: { en: "Eight modules, in full", zh: "八个模块，完整说明" },
+    h1: { en: "Eight modules, *in full*", zh: "八个模块，*完整*说明" },
     lede: {
       en: "Purpose, trigger, inputs, what the agent does, what it returns, and what a person does with it. Where a module refuses something, the refusal is written into the module rather than left to policy.",
       zh: "用途、触发方式、输入、智能体做什么、返回什么、以及人拿到之后做什么。模块拒绝做的事，写在模块里，而不是丢给制度去管。",
@@ -189,7 +213,10 @@ export const PAGES = {
   },
   security: {
     title: { en: "Audit", zh: "审计" },
-    h1: { en: "Who changed what, when, and why", zh: "谁改了什么、什么时候改的、为什么" },
+    h1: {
+      en: "Who changed what, when, and *why*",
+      zh: "谁改了什么、什么时候改的、*为什么*",
+    },
     lede: {
       en: "Role-based access, client-level isolation, an audit event on every meaningful action, and failure rules that keep a broken integration visible instead of silent.",
       zh: "基于角色的权限、客户级别的数据隔离、每个有意义的动作都留一条审计事件，以及一套失败规则：让坏掉的对接留在明面上，而不是悄无声息。",
@@ -215,7 +242,17 @@ export const SECURITY = {
         "Takeover",
         "Lead status change",
       ],
-      zh: ["生成", "编辑", "审核", "锁定", "交接", "发布登记", "AI 回复", "转人工", "线索状态变更"],
+      zh: [
+        "生成",
+        "编辑",
+        "审核",
+        "锁定",
+        "交接",
+        "发布登记",
+        "AI 回复",
+        "转人工",
+        "线索状态变更",
+      ],
     } satisfies LL,
     note: {
       en: "Each event shows who changed the record, when, what it looked like before, and the reason where a reason is required.",
@@ -259,7 +296,10 @@ export const SECURITY = {
     } satisfies LL,
   },
   ingestion: {
-    h: { en: "How a client document becomes retrievable", zh: "客户文档怎么变成可检索的" },
+    h: {
+      en: "How a client document becomes retrievable",
+      zh: "客户文档怎么变成可检索的",
+    },
     steps: {
       en: [
         "Upload",
@@ -271,7 +311,16 @@ export const SECURITY = {
         "Index",
         "Publish to the approved set",
       ],
-      zh: ["上传", "解析或 OCR", "补元数据与权限", "审核", "切块", "向量化", "建索引", "发布到已批准集合"],
+      zh: [
+        "上传",
+        "解析或 OCR",
+        "补元数据与权限",
+        "审核",
+        "切块",
+        "向量化",
+        "建索引",
+        "发布到已批准集合",
+      ],
     } satisfies LL,
     note: {
       en: "A new version of a document does not silently overwrite the evidence a past output already used. Old results keep pointing at what they actually read.",
@@ -279,7 +328,10 @@ export const SECURITY = {
     },
   },
   model: {
-    h: { en: "What the model does and does not learn", zh: "模型学什么，不学什么" },
+    h: {
+      en: "What the model does and does not learn",
+      zh: "模型学什么，不学什么",
+    },
     items: {
       en: [
         "An existing pretrained model, reached through a gateway that handles provider switching, cost limits, model versions, and structured output.",
@@ -304,7 +356,10 @@ export const SECURITY = {
     items: [
       {
         role: { en: "Contributor", zh: "内容执行" },
-        can: { en: "Creates topics, drafts, and content tasks.", zh: "建选题、写草稿、建内容任务。" },
+        can: {
+          en: "Creates topics, drafts, and content tasks.",
+          zh: "建选题、写草稿、建内容任务。",
+        },
       },
       {
         role: { en: "Reviewer", zh: "审核" },
@@ -374,7 +429,10 @@ export const COMMON = {
   back: { en: "Back to the line", zh: "回到线路" },
   role: { en: "Authority", zh: "权限" },
   produces: { en: "Leaves behind", zh: "留下什么" },
-  conditions: { en: "Proves before the next signal clears", zh: "下个信号放行前需证明" },
+  conditions: {
+    en: "Proves before the next signal clears",
+    zh: "下个信号放行前需证明",
+  },
   block: { en: "Block", zh: "区间" },
   post: { en: "Post", zh: "信号机" },
 } satisfies Record<string, L>;

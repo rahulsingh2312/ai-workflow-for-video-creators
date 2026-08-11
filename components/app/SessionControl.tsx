@@ -3,10 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import type { Lang } from "@/lib/i18n";
-import { Signal } from "@/components/Signal";
+import { clsx } from "@/lib/clsx";
 
 type Session = { name: string; roles: string[] } | null;
+
+const control =
+  "press flex h-8 shrink-0 items-center whitespace-nowrap rounded-md text-[13px] " +
+  "[transition:background-color_160ms_var(--ease-out),border-color_160ms_var(--ease-out),color_160ms_var(--ease-out)]";
 
 /**
  * Sign in / sign out, in the header on every page.
@@ -51,36 +56,62 @@ export function SessionControl({ lang }: { lang: Lang }) {
     }
   }, [lang, router]);
 
-  /* Nothing until the answer is in, so the control never flips under the cursor. */
-  if (!known) return <span className="w-[4.5rem]" aria-hidden />;
+  /*
+    A reserved box until the answer is in. Without it the header's right edge
+    jumps once on every page load, which is the kind of movement nobody can
+    name afterwards but everybody feels.
+  */
+  if (!known) return <span className="h-8 w-[5.25rem]" aria-hidden />;
 
   if (!session) {
     return (
       <Link
         href={`/${lang}/login`}
         prefetch={false}
-        className="plate flex items-center gap-2 rounded-sm border border-rule bg-panel-inset px-2.5 py-1 text-[10px] text-bone-dim transition-colors duration-150 hover:border-rule-strong hover:text-bone"
+        className={clsx(
+          control,
+          "group gap-1.5 bg-bone pl-3 pr-2.5 font-medium text-panel",
+          "hov:bg-bone-dim",
+        )}
       >
-        <Signal aspect="dark" size="xs" />
         {t("Sign in", "登录")}
+        <ArrowRight
+          className="size-3.5 shrink-0 [transition:transform_200ms_var(--ease-out)] group-hov:translate-x-0.5"
+          strokeWidth={2}
+          aria-hidden
+        />
       </Link>
     );
   }
 
+  const initials = session.name.slice(0, zh ? 1 : 2);
+
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex items-center gap-1.5">
       <span
-        className="plate hidden items-center gap-2 rounded-sm border border-rule bg-panel-inset px-2.5 py-1 text-[10px] text-bone-dim sm:flex"
+        className="hidden items-center gap-2 rounded-md border border-rule bg-panel-inset py-1 pl-1 pr-2.5 sm:flex"
         title={session.roles.join(", ")}
       >
-        <Signal aspect="clear" size="xs" />
-        {session.name}
+        <span
+          aria-hidden
+          className="flex size-5 items-center justify-center rounded-[5px] bg-panel-raised text-[10px] font-medium uppercase leading-none text-bone-dim"
+        >
+          {initials}
+        </span>
+        <span className="text-[13px] leading-none text-bone">
+          {session.name}
+        </span>
       </span>
       <button
         type="button"
         onClick={signOut}
         disabled={busy}
-        className="plate rounded-sm border border-rule bg-panel-inset px-2.5 py-1 text-[10px] text-bone-dim transition-colors duration-150 hover:border-rule-strong hover:text-bone disabled:opacity-50"
+        className={clsx(
+          control,
+          "px-2.5 text-bone-dim disabled:opacity-50",
+          "hov:bg-panel-raised",
+          "hov:text-bone",
+        )}
       >
         {busy ? t("Signing out", "退出中") : t("Sign out", "退出")}
       </button>
